@@ -147,6 +147,7 @@ const selectedKeys = new Set();
 /* ===== フォルダ一覧読み込み → セレクタへ反映 ===== */
 async function loadFolderIndex(){
   const res = await fetch(CONFIG.INDEX_URL);
+  console.log("[index] url=", CONFIG.INDEX_URL, "status=", res.status);
   if (!res.ok) throw new Error("index fetch failed");
   const { folders=[] } = await res.json();
 
@@ -178,7 +179,9 @@ async function loadFolderIndex(){
 
 /* ===== フォルダ内アイテム読み込み → グリッド描画 ===== */
 async function renderFolder(manifestUrl){
+  console.log("[manifest] url=", manifestUrl);
   const res = await fetch(manifestUrl);
+  console.log("[manifest] status=", res.status);
   if (!res.ok) throw new Error("manifest fetch failed");
   const data = await res.json();
   currentItems = data.items || [];
