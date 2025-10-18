@@ -29,18 +29,17 @@ body{
 }
 .container{max-width:1100px;margin:24px auto;padding:0 16px}
 
-/* ===== ヘッダー（Topbar） ===== */
-.topbar{
-  display:flex;gap:12px;align-items:center;justify-content:space-between;
-  background:#fff;
-  border:1px solid var(--border);
-  padding:14px 16px;border-radius:16px;margin:12px 0 20px;
-}
-.brand{display:flex;gap:12px;align-items:center}
-.brand h1{font-size: clamp(18px,4vw,22px); margin:0; line-height:1.25}
-.sub{color:var(--muted);font-size:12px}
-.right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-
+/* ヘッダ */
+  .topbar{
+    display:flex; gap:12px; align-items:center; justify-content:space-between;
+    background:#fff; border:1px solid var(--border);
+    padding:14px 16px; border-radius:16px; margin:12px 0 20px;
+  }
+/* タイトル（少し小さめ） */
+  .brand h1{
+    font-size:clamp(18px, 3.8vw, 22px);
+    line-height:1.25; margin:0;
+  }
 /* バッジ（READY等） */
 .badge-ok{
   background:var(--chip); color:#456b4a;
@@ -120,16 +119,17 @@ video,.modal-img{
 </head>
 <body>
 <div class="container">
-  <header class="topbar">
-    <div class="brand">
-      <h1>カタログ</h1>
-      <div class="sub">イベントのプレビュー & 原本ダウンロード</div>
-    </div>
-    <div class="right">
-      <span class="badge-ok" id="badge-status">READY</span>
-      <button class="btn ghost" id="open-manifest">マニフェスト</button>
-    </div>
-  </header>
+  </head>
+<body>
+<div class="container">
+ <header class="topbar">
+  <div class="brand">
+    <h1>カタログ</h1>
+  </div>
+  <div class="right">
+    <a id="toCatalog" class="btn ghost small" href="#" role="button">アップロードへ</a>
+  </div>
+</header>
 
   <div id="grid" class="grid"></div>
   <footer>© Taiko Media</footer>
