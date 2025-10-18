@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>アップロード｜Fujizukadaiko Media</title>
+<title>動画・画像アップロード｜藤塚太鼓</title>
 <meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
@@ -201,22 +201,30 @@
     color:var(--muted);
   }
   
-  /* LIFFヒント行（タイトル下に表示） */
-  .liff-hint{
-    margin-top:8px;
-    font-size:12px;
-    color:var(--muted);
-  }
-  .liff-hint a{
-    color:#2a7b8a;        /* 水色系でリンク */
-    text-decoration: underline;
+  /* アンカーでも下線を消してボタン化 */
+  a.btn { 
+    text-decoration: none; 
+    display: inline-block; 
   }
   
-  /* ヘッダー右側ボタン（カタログへ） */
+  /* 使い方ボタンと同じゴーストボタン（薄い水色チップ風） */
   .btn.ghost{
-    background:#f2fbfd;
-    color:#1f2d32;
+    background:#f2fbfd;          /* 薄い水色 */
+    color:#1f2d32;               /* 文字は寒色寄り */
     border:1px solid var(--border);
+  }
+  
+  /* 小さめ角丸・高さ感は small に合わせる */
+  .btn.small{
+    padding:8px 12px;
+    font-size:13px;
+    border-radius:10px;          /* 角を四角寄りに（必要なければ既存の999pxでもOK） */
+  }
+  
+  /* アクセシビリティ的にフォーカスリングだけ薄めで */
+  .btn:focus-visible{
+    outline: 2px solid rgba(162,215,221,.6);
+    outline-offset: 2px;
   }
   /* 選択中ファイルのプレリスト */
   #prelist .fitem{
@@ -523,7 +531,7 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
   const totalMB = [...files].reduce((s,f)=> s + (f.size||0), 0) / 1024 / 1024;
   if (totalMB > THRESHOLD_MB) {
     const go = confirm(`選択されたファイル合計は約 ${totalMB.toFixed(1)} MB です。\n大容量はLIFF内だと不安定な場合があります。外部ブラウザで開きますか？`);
-    if (go) { window.open(STANDALONE_URL, "_blank"); return; }
+    if (go) { openExternal(STANDALONE_URL); return; }
   }
 
   const barFill  = document.querySelector("#bar > div");
@@ -617,6 +625,26 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
   goBtn.disabled = false; goBtn.textContent = "アップロード開始";
   renderPreUploadList(); 
 });
+
+// 外部ブラウザで開く（LIFFがあれば優先、なければ安全フォールバック）
+function openExternal(url){
+  try{
+    if (window.liff && typeof liff.openWindow === "function") {
+      liff.openWindow({ url, external: true }); // ← LINE公式の外部遷移
+      return;
+    }
+  }catch(_){/* noop */}
+
+  // LINEの内蔵ブラウザは _blank が通らないことがあるので同タブ遷移に寄せる
+  if (/Line\/[\d.]+/i.test(navigator.userAgent)) {
+    location.href = url;
+    return;
+  }
+
+  // 通常ブラウザは _blank、ブロック時は同タブへ
+  const w = window.open(url, "_blank");
+  if (!w) location.href = url;
+}
   
 // サイズ表記ヘルパ
 function fmtSize(bytes){
