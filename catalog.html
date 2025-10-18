@@ -66,39 +66,75 @@
 </dialog>
 
 <script>
-/* ===== 設定（上部入力に初期値を反映） ===== */
-const DEFAULTS = {
-  WORKER_ORIGIN: "https://taiko-worker-plain.fujizukadaiko.workers.dev",
-  MANIFEST_URL:  "https://fujizukadaiko.github.io/taiko-media-front-test/manifest/20251012-concertA.json",
-};
-document.getElementById("worker").value = DEFAULTS.WORKER_ORIGIN;
-document.getElementById("manifest").value = DEFAULTS.MANIFEST_URL;
+/* ===== 必要な設定（ここだけ編集） ===== */
+const WORKER_ORIGIN  = "https://taiko-worker-plain.fujizukadaiko.workers.dev"; // 例: https://taiko-worker-plain.xxx.workers.dev
+const MANIFEST_URL   = "https://fujizukadaiko.github.io/taiko-media-front-test/manifest/20251012-concertA.json";
 
-/* ===== ヘルパ ===== */
+/* ===== ここから下は触らなくてOK ===== */
+
+// 末尾/重複スラッシュや全角をケアして安全に結合
+const normalizeUrl = (s) =>
+  s.replace(/\s+/g, "")              // 改行/空白を除去
+   .replace(/[：]/g, ":")            // 全角コロン→半角
+   .replace(/[／]/g, "/");           // 全角スラッシュ→半角
+const joinPath = (base, path) =>
+  normalizeUrl(base).replace(/\/+$/,"") + path; // base末尾スラッシュ消して結合
+
 const qs = (s, p=document) => p.querySelector(s);
 const el = (t, c) => Object.assign(document.createElement(t), c);
 const isVideo = (name='') => /\.(mp4|mov|webm)$/i.test(name);
 
-/* ===== メイン ===== */
-qs("#load").onclick = async () => {
-  const WORKER = qs("#worker").value.trim();
-  const MANIFEST = qs("#manifest").value.trim();
-  if (!/^https?:\/\//.test(WORKER) || !/^https?:\/\//.test(MANIFEST)) {
-    return alert("URL を確認してください");
+async function loadManifest() {
+  try {
+    console.log("MANIFEST_URL =", MANIFEST_URL);
+    const res = await fetch(MANIFEST_URL);
+    if (!res.ok) throw new Error("manifest fetch failed: " + res.status);
+    return await res.json();
+  } catch (e) {
+    console.error(e);
+    alert("マニフェストの読み込みに失敗しました。\nURLや公開状態を確認してください。");
+    throw e;
   }
-  const res = await fetch(MANIFEST);
-  if (!res.ok) return alert("マニフェスト読込に失敗しました");
-  const data = await res.json(); // { eventId, folderNasLink?, items: [{title,key,thumb?,nasLink?}] }
+}
+function openViewer(title, url, video=false){
+  try {
+    const dlg = qs("#viewer");
+    qs("#v-title").textContent = title;
+    const box = qs("#v-container"); box.innerHTML = "";
+    if (video) {
+      const v = el("video", { controls:true }); v.src = url; box.appendChild(v);
+    } else {
+      const img = el("img", { className:"modal-img", alt:title }); img.src = url; box.appendChild(img);
+    }
+    dlg.showModal();
+  } catch(e) {
+    console.error(e);
+    window.open(url, "_blank"); // モーダルが使えない環境のフォールバック
+  }
+}
 
+// 画面初期化（入力欄を消して固定表記に変更してもOK）
+document.addEventListener("DOMContentLoaded", async () => {
+  // ヘッダの入力欄を使っていた場合は表示置き換え
+  const hdr = document.querySelector(".controls");
+  if (hdr) {
+    hdr.innerHTML = `<code style="padding:6px 8px;border:1px solid #222;border-radius:8px;background:#101319">
+      WORKER: ${WORKER_ORIGIN}</code>
+      <code style="padding:6px 8px;border:1px solid #222;border-radius:8px;background:#101319">
+      MANIFEST: ${MANIFEST_URL}</code>`;
+  }
+
+  const data = await loadManifest(); // { eventId, folderNasLink?, items: [...] }
   const grid = qs("#grid"); grid.innerHTML = "";
-  data.items.forEach(item => {
+
+  for (const item of (data.items || [])) {
     const card = el("div", { className:"card" });
     const img = el("img", { className:"thumb", alt:item.title || "" });
     img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
     card.appendChild(img);
 
     const meta = el("div", { className:"meta" });
-    meta.appendChild(el("div", { className:"title", textContent:item.title || item.key.split("/").pop() }));
+    meta.appendChild(el("div", { className:"title", textContent:item.title || item.key?.split("/").pop() || "" }));
 
     const badges = el("div", { className:"badges" });
     badges.appendChild(el("span", { className:"badge", textContent: isVideo(item.key) ? "video" : "image" }));
@@ -107,33 +143,47 @@ qs("#load").onclick = async () => {
 
     const actions = el("div", { className:"actions" });
 
-    // 閲覧（B2 一時URLで高速プレビュー）
+    // プレビュー（B2の一時URL）
     const btnView = el("button", { className:"view", textContent:"プレビュー" });
     btnView.onclick = async () => {
-      const pres = await fetch(`${WORKER}/files/presign-get`, {
-        method:"POST",
-        headers: { "content-type":"application/json" },
-        body: JSON.stringify({ key: item.key, expires: 300 })
-      });
-      const { url } = await pres.json();
-      openViewer(item.title || "", url, isVideo(item.key));
+      try {
+        const urlPresign = joinPath(WORKER_ORIGIN, "/files/presign-get");
+        const pres = await fetch(urlPresign, {
+          method:"POST",
+          headers: { "content-type":"application/json" },
+          body: JSON.stringify({ key: item.key, expires: 300 })
+        });
+        const { url } = await pres.json();
+        if (!url) throw new Error("presign-get returned empty url");
+        openViewer(item.title || "", url, isVideo(item.key));
+      } catch (e) {
+        console.error(e);
+        alert("プレビュー用URLの発行に失敗しました");
+      }
     };
     actions.appendChild(btnView);
 
-    // 原本DL（NASがあればNAS、なければB2の一時URL）
+    // 原本DL（NAS>優先 / フォールバックはB2一時URL）
     const aDL = el("a", { className:"dl", target:"_blank", textContent:"原本DL" });
-    if (item.nasLink) {
+    if (item.nasLink && /^https?:\/\//.test(item.nasLink)) {
       aDL.href = item.nasLink;
     } else {
       aDL.onclick = async (e) => {
         e.preventDefault();
-        const pres = await fetch(`${WORKER}/files/presign-get`, {
-          method:"POST",
-          headers: { "content-type":"application/json" },
-          body: JSON.stringify({ key: item.key, expires: 300, attachment: true })
-        });
-        const { url } = await pres.json();
-        window.open(url, "_blank");
+        try {
+          const urlPresign = joinPath(WORKER_ORIGIN, "/files/presign-get");
+          const pres = await fetch(urlPresign, {
+            method:"POST",
+            headers: { "content-type":"application/json" },
+            body: JSON.stringify({ key: item.key, expires: 300, attachment: true })
+          });
+          const { url } = await pres.json();
+          if (!url) throw new Error("presign-get returned empty url");
+          window.open(url, "_blank");
+        } catch (e) {
+          console.error(e);
+          alert("ダウンロード用URLの発行に失敗しました");
+        }
       };
     }
     actions.appendChild(aDL);
@@ -141,30 +191,16 @@ qs("#load").onclick = async () => {
     meta.appendChild(actions);
     card.appendChild(meta);
     grid.appendChild(card);
-  });
+  }
 
-  // イベント全体DL（フォルダ共有があれば表示）
-  if (data.folderNasLink) {
+  // フォルダ全体のNAS共有があれば目立つ場所に
+  if (data.folderNasLink && /^https?:\/\//.test(data.folderNasLink)) {
     const bar = el("div", { className:"card", style:"padding:12px;border:1px dashed #2a2e38" });
     const link = el("a", { className:"dl", href:data.folderNasLink, target:"_blank", textContent:"フォルダごとダウンロード（NAS共有）" });
     bar.appendChild(link);
     grid.prepend(bar);
   }
-};
-
-function openViewer(title, url, video=false){
-  qs("#v-title").textContent = title;
-  const box = qs("#v-container"); box.innerHTML = "";
-  if (video) {
-    const v = el("video", { controls:true, src:url });
-    box.appendChild(v);
-  } else {
-    const img = el("img", { className:"modal-img", src:url, alt:title });
-    box.appendChild(img);
-  }
-  qs("#viewer").showModal();
-}
-qs("#v-close").onclick = () => qs("#viewer").close();
+});
 </script>
 </body>
 </html>
