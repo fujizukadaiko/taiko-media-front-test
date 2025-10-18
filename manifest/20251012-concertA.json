@@ -1,0 +1,23 @@
+{
+  "eventId": "20251012-concertA",
+  "createdAt": "2025-10-12T23:59:00Z",
+  "folderNasLink": "https://<あなたのNAS>/sharing/abc123", 
+  "items": [
+    {
+      "title": "演奏_1枚目",
+      "key": "staging/202510/20251012-concertA/1697012345678_xxx_image001.jpg",
+      "type": "image",                      // "image" | "video"（任意）
+      "mime": "image/jpeg",                 // 任意（表示ヒント）
+      "size": 283944,                       // 任意（バイト）
+      "thumb": "",                          // 任意（あればサムネURL）
+      "nasLink": ""                         // 任意（そのファイル個別のNAS共有リンク）
+    },
+    {
+      "title": "MCダイジェスト",
+      "key": "staging/202510/20251012-concertA/1697012350000_yyy_movie001.mp4",
+      "type": "video",
+      "mime": "video/mp4",
+      "duration": 95                        // 任意（秒）
+    }
+  ]
+}
