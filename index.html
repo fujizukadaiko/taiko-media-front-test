@@ -120,6 +120,7 @@
     .row-actions .btn{ width:auto; }  /* 行内は幅自動 */
     .row-actions .btn.small{ padding:8px 12px; }
   }
+  .btn[disabled]{ opacity:.6; cursor:not-allowed }
 </style>
 </head>
 <body>
@@ -161,7 +162,7 @@
 
 <script>
 /** ===== 設定（ここだけ変更） ===== */
-const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
+const WORKER_ORIGIN = "サンプル";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
 const SELF_DELETE_TTL_SEC = 30*60; // 30分（参考表示用）
@@ -186,60 +187,65 @@ async function detectTakenAt(file){
 }
 
 /** ===== 履歴の保存・描画 ===== */
-function loadHistory(){
-  try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch{ return []; }
-}
-function saveHistory(list){
-  localStorage.setItem(LS_KEY, JSON.stringify(list.slice(-200))); // 直近200件くらい保持
-}
-function addHistory(entry){
-  const list = loadHistory();
-  list.push(entry);
-  saveHistory(list);
-  renderHistory();
-}
-function removeHistoryByKey(key){
-  const list = loadHistory().filter(x=>x.key!==key);
-  saveHistory(list);
-  renderHistory();
-}
+function loadHistory(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch{ return []; } }
+function saveHistory(list){ localStorage.setItem(LS_KEY, JSON.stringify(list.slice(-200))); }
+function addHistory(entry){ const list = loadHistory(); list.push(entry); saveHistory(list); renderHistory(); }
 function fmtRemain(ms){
   if (ms<=0) return "期限切れ";
   const m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000);
   return `${m}分${pad2(s)}秒`;
 }
-async function reissueUrl(item, $row){
+async function reissueUrl(item, btn){
+  // 視覚フィードバック & 連打防止
+  if (btn) {
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    const prev = btn.textContent;
+    btn.textContent = '発行中…';
+
+    // 後で使うため保持
+    btn._prevText = prev;
+  }
+
   const res = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
     method:"POST",
     headers:{ "content-type":"application/json" },
     body: JSON.stringify({ key:item.key, expires: PRESIGN_EXPIRES })
   });
   const { url } = await res.json();
+
   item.lastPresignUrl = url || "";
   item.lastPresignAt = Date.now();
+
   const list = loadHistory();
   const idx = list.findIndex(x=>x.key===item.key);
   if (idx>=0){ list[idx]=item; saveHistory(list); }
-  renderHistory(); // 再描画
+
+  renderHistory(); // UI更新
+
+  // 完了表示 → 少し待って解除
+  if (btn) {
+    btn.textContent = '発行済み ✓';
+    btn.setAttribute('aria-busy', 'false');
+    setTimeout(() => {
+      btn.textContent = btn._prevText || '再発行';
+      btn.disabled = false;
+    }, 1500);
+  }
 }
 function renderHistory(){
   const list = loadHistory().slice().reverse();
   const box = $("#result");
   box.innerHTML = "";
-
   for (const item of list){
     const row = document.createElement("div");
     row.className = "item-row" + (item.cancelled ? " cancelled" : "");
 
-    // タイトル/リンク
     const link = document.createElement("a");
-    link.className = "hist-name";                       // ★ 追加：小さめ表示用
+    link.className = "hist-name";
     link.textContent = `アップロード完了：${item.name}（一時URL/数分）`;
-    if (item.cancelled || !item.lastPresignUrl){
-      link.href = "#"; link.className += " name-cancelled";
-    }else{
-      link.href = item.lastPresignUrl; link.target = "_blank";
-    }
+    if (item.cancelled || !item.lastPresignUrl){ link.href="#"; link.classList.add("name-cancelled"); }
+    else { link.href=item.lastPresignUrl; link.target="_blank"; }
     row.appendChild(link);
 
     if (item.cancelled){
@@ -251,68 +257,64 @@ function renderHistory(){
 
     const actions = document.createElement("div");
     actions.className = "row-actions";
-    
-    // 再発行（取り消し済は非表示）
+
     if (!item.cancelled){
       const btnRe = document.createElement("button");
       btnRe.className = "btn small ghost";
       btnRe.textContent = "再発行";
-      btnRe.onclick = ()=> reissueUrl(item, row);
-      actions.appendChild(btnRe);                        // ★ 先に追加（左）
+      btnRe.onclick = (e)=> reissueUrl(item, e.currentTarget);
+      actions.appendChild(btnRe);
+
+      if (item.deleteToken && item.deleteUntil){
+        const pill = document.createElement("span");
+        pill.className = "pill";
+
+        const btnDel = document.createElement("button");
+        btnDel.className = "btn small";
+        btnDel.style.background = "var(--accent-2)";
+        btnDel.style.color = "#0b0c10";
+        btnDel.textContent = "取り消す";
+
+        const remainSpan = document.createElement("span");
+        const updateRemain = ()=>{
+          const ms = new Date(item.deleteUntil).getTime() - Date.now();
+          if (ms <= 0){
+            remainSpan.textContent = "期限切れ";
+            clearInterval(timer);
+            return;
+          }
+          remainSpan.textContent = `残り ${fmtRemain(ms)}`;
+        };
+        updateRemain();
+        const timer = setInterval(updateRemain, 1000);
+
+        btnDel.onclick = async ()=>{
+          if (!confirm("このファイルを取り消します。よろしいですか？")) return;
+          const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
+            method:"POST",
+            headers:{ "content-type":"application/json" },
+            body: JSON.stringify({ token:item.deleteToken })
+          });
+          const js = await res.json().catch(()=>({}));
+          if (res.ok && js.ok){
+            clearInterval(timer);
+            item.cancelled = true;
+            item.cancelledAt = Date.now();
+            item.lastPresignUrl = "";
+            const all = loadHistory().map(x => x.key===item.key ? item : x);
+            saveHistory(all);
+            renderHistory();
+          }else{
+            alert("取り消しに失敗しました");
+          }
+        };
+
+        pill.appendChild(btnDel);
+        pill.appendChild(remainSpan);
+        actions.appendChild(pill);
+      }
     }
 
-    // 取り消し（取り消し済は非表示）
-    if (!item.cancelled && item.deleteToken && item.deleteUntil){
-      const pill = document.createElement("span");
-      pill.className = "pill";
-    
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn small";
-      btnDel.style.background = "var(--accent-2)";
-      btnDel.style.color = "#0b0c10";
-      btnDel.textContent = "取り消す";
-    
-      const remainSpan = document.createElement("span");
-    
-      const updateRemain = ()=>{
-        const ms = new Date(item.deleteUntil).getTime() - Date.now();
-        if (ms <= 0){
-          remainSpan.textContent = "期限切れ";
-          clearInterval(timer);
-          return;
-        }
-        const m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000);
-        remainSpan.textContent = `残り ${m}分${String(s).padStart(2,"0")}秒`;
-      };
-      updateRemain();
-      const timer = setInterval(updateRemain, 1000);
-    
-      btnDel.onclick = async ()=>{
-        if (!confirm("このファイルを取り消します。よろしいですか？")) return;
-        const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
-          method:"POST",
-          headers:{ "content-type":"application/json" },
-          body: JSON.stringify({ token:item.deleteToken })
-        });
-        const js = await res.json().catch(()=>({}));
-        if (res.ok && js.ok){
-          clearInterval(timer);
-          item.cancelled = true;
-          item.cancelledAt = Date.now();
-          item.lastPresignUrl = "";
-          const all = loadHistory().map(x => x.key===item.key ? item : x);
-          saveHistory(all);
-          renderHistory();                                // 即時反映（打ち消し線＆バッジ）
-        }else{
-          alert("取り消しに失敗しました");
-        }
-      };
-    
-      pill.appendChild(btnDel);
-      pill.appendChild(remainSpan);
-      actions.appendChild(pill);                           // ★ 再発行の右側に並ぶ
-    }
-    
     row.appendChild(actions);
     box.appendChild(row);
   }
@@ -339,78 +341,100 @@ $("#file").addEventListener("change", () => {
 
 /** ===== メイン：アップロード ===== */
 document.getElementById("go").onclick = async () => {
-  const files = document.getElementById("file").files;
+  if (!/^https?:\/\//.test(WORKER_ORIGIN)) { alert("Worker URL が不正です"); return; }
+
+  const fileEl   = document.getElementById("file");
+  const files    = fileEl.files;
   if (!files.length) return alert("ファイルを選んでください。");
 
-  const bar = document.querySelector("#bar > div");
-  const status = document.getElementById("status");
-  bar.style.width = "0%"; status.textContent = ""; 
+  const barFill  = document.querySelector("#bar > div");
+  const statusEl = document.getElementById("status");
+  const fileInfo = document.getElementById("fileinfo");
+  const goBtn    = document.getElementById("go");
 
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    if (f.size > MAX_FILE_MB * 1024 * 1024) { alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
+  // UI初期化
+  statusEl.textContent = "";
+  barFill.style.width = "0%";
+  goBtn.disabled = true;
+  goBtn.textContent = "アップロード中…";
 
-    const { at: takenAt } = await detectTakenAt(f);
-    const { ym, ymd } = ymdSegments(takenAt);
-    const hh = pad2(takenAt.getHours()), mm = pad2(takenAt.getMinutes()), ss = pad2(takenAt.getSeconds());
-    const timeSlug = `${hh}${mm}${ss}`;
-    const rand = Math.random().toString(36).slice(2,8);
-    const safeName = f.name.replace(/[^\w.\-]/g, "_");
-    const key = `staging/${ym}/${ymd}/${timeSlug}_${rand}_${safeName}`;
-    const contentType = f.type || "application/octet-stream";
+  const total = files.length;
+  let done = 0;
 
-    // 進捗付き POST → Worker が B2 に代理PUTし、削除トークンを返す
-    const delInfo = await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`, true);
-      xhr.timeout = 5*60*1000;
-      xhr.upload.onprogress = (ev) => {
-        if (ev.lengthComputable) {
-          const p = Math.round((ev.loaded/ev.total)*100);
-          bar.style.width = p + "%";
-          status.textContent = `アップロード中 ${i+1}/${files.length} … ${p}%`;
-        }
-      };
-      xhr.onload = () => {
-        if (xhr.status>=200 && xhr.status<300){
-          try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({ ok:true }); }
-        } else reject(new Error("proxy PUT " + xhr.status));
-      };
-      xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
-      xhr.onerror   = () => reject(new Error("proxy PUT network error"));
-      xhr.send(f);
-    });
+  try {
+    for (let i = 0; i < total; i++) {
+      const f = files[i];
+      if (f.size > MAX_FILE_MB * 1024 * 1024) { alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
 
-    // 一時URL（5分）を発行
-    let presigned = "";
-    try{
-      const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
-        method:"POST",
-        headers:{ "content-type":"application/json" },
-        body: JSON.stringify({ key, expires: PRESIGN_EXPIRES })
+      statusEl.textContent = `アップロード中 ${i+1}/${total} … 0%`;
+
+      const { at: takenAt } = await detectTakenAt(f);
+      const { ym, ymd } = ymdSegments(takenAt);
+      const rand = Math.random().toString(36).slice(2,8);
+      const safeName = f.name.replace(/[^\w.\-]/g, "_");
+      const hh = pad2(takenAt.getHours()), mm = pad2(takenAt.getMinutes()), ss = pad2(takenAt.getSeconds());
+      const timeSlug = `${hh}${mm}${ss}`;
+      const key = `staging/${ym}/${ymd}/${timeSlug}_${rand}_${safeName}`;
+      const contentType = f.type || "application/octet-stream";
+
+      // 代理PUT
+      const proxyUrl = `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
+      const delInfo = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", proxyUrl, true);
+        xhr.timeout = 5 * 60 * 1000;
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            const p = Math.round((ev.loaded / ev.total) * 100);
+            barFill.style.width = p + "%";
+            statusEl.textContent = `アップロード中 ${i+1}/${total} … ${p}%`;
+          }
+        };
+        xhr.onload   = () => { if (xhr.status>=200 && xhr.status<300) { try{ resolve(JSON.parse(xhr.responseText)); }catch{ resolve({ok:true}); } } else reject(new Error("proxy PUT " + xhr.status)); };
+        xhr.ontimeout= () => reject(new Error("proxy PUT timeout"));
+        xhr.onerror  = () => reject(new Error("proxy PUT network error"));
+        xhr.send(f);
       });
-      const { url } = await pres.json();
-      presigned = url || "";
-    }catch{}
 
-    // 履歴に保存（再読み込みしても残る）
-    addHistory({
-      key, name: safeName,
-      deleteToken: delInfo?.deleteToken || null,
-      deleteUntil: delInfo?.deleteUntil || null,
-      createdAt: Date.now(),
-      lastPresignUrl: presigned,
-      lastPresignAt: Date.now()
-    });
+      // 一時URL 5分
+      let presigned = "";
+      try{
+        const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
+          method:"POST",
+          headers:{ "content-type":"application/json" },
+          body: JSON.stringify({ key, expires: PRESIGN_EXPIRES })
+        });
+        const { url } = await pres.json();
+        presigned = url || "";
+      }catch{}
+
+      // 履歴へ
+      addHistory({
+        key, name: safeName,
+        deleteToken: delInfo?.deleteToken || null,
+        deleteUntil: delInfo?.deleteUntil || null,
+        createdAt: Date.now(),
+        lastPresignUrl: presigned,
+        lastPresignAt: Date.now()
+      });
+
+      done++;
+      statusEl.textContent = `完了 ${done}/${total}`;
+    }
+
+    // 完了表示 & リセット
+    statusEl.textContent = "すべて完了！";
+    barFill.style.width = "100%";
+    try { fileEl.value = ""; } catch {}
+    if (fileInfo) fileInfo.textContent = "未選択";
+
+  } catch (e) {
+    console.error(e);
+    alert("アップロードに失敗しました");
+  } finally {
+    goBtn.disabled = false;
+    goBtn.textContent = "アップロード開始";
   }
-
-  status.textContent = "すべて完了！";
-  bar.style.width = "100%";
-
-  // ✅ アップ後に入力をリセット（同じファイルの連投を防止）
-  const picker = document.getElementById("file");
-  picker.value = "";                     // file input クリア
-  $("#fileinfo").textContent = "未選択";
 };
 
 /** 初期描画（保存済み履歴を表示） */
