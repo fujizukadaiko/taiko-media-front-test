@@ -1,150 +1,225 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Upload to B2 via Workers</title>
-  <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Arial; margin: 24px; }
-    .box { max-width: 680px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
-    .row { margin: 12px 0; }
-    #bar { width: 100%; height: 10px; background: #eee; border-radius: 6px; overflow: hidden; }
-    #bar > div { height: 100%; width: 0%; background: #4caf50; transition: width .1s linear; }
-    code { background: #f5f5f5; padding: 2px 6px; border-radius: 6px; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>アップロード｜Taiko Media</title>
+<style>
+:root{
+  --bg:#0b0c10; --panel:#14161a; --text:#e6e7ea; --muted:#9aa3b2;
+  --accent:#7c5cff; --accent-2:#2dd4bf; --border:#22252c;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11); color:var(--text); 
+  font:16px/1.6 system-ui, -apple-system, "Segoe UI", Arial;
+}
+.container{max-width:860px;margin:24px auto;padding:0 16px}
+
+/* Topbar */
+.topbar{
+  display:flex;gap:12px;align-items:center;justify-content:space-between;
+  background:linear-gradient(180deg,#111318,#0f1116);
+  border:1px solid var(--border); padding:12px 14px;border-radius:14px;margin:12px 0 20px;
+  box-shadow:0 6px 24px rgb(0 0 0 / .25);
+}
+.brand{display:flex;gap:12px;align-items:center}
+.brand h1{font-size:20px;margin:0}
+.sub{color:var(--muted);font-size:12px}
+.right{display:flex;gap:8px;align-items:center}
+.btn{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+.btn.ghost{background:#1a1c22}
+.btn:active{transform:translateY(1px)}
+
+/* Panel */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  padding:14px; box-shadow:0 8px 30px rgb(0 0 0 / .3)}
+.row{margin:12px 0}
+label{display:block;margin:0 0 6px;color:#cfd4e1;font-size:14px}
+input[type="text"]{width:100%;background:#0f1116;color:var(--text);border:1px solid var(--border);
+  padding:12px;border-radius:12px;font-size:16px}
+
+/* File picker */
+.filebox{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input[type="file"]{display:none}
+.filebtn{background:#1a1c22;border:1px solid var(--border);color:#e6e7ea;padding:12px 14px;border-radius:12px;cursor:pointer}
+.fileinfo{color:var(--muted);font-size:13px}
+
+/* Progress */
+.progress{height:10px;background:#101319;border:1px solid #222;border-radius:999px;overflow:hidden}
+.progress>div{height:100%;width:0;background:var(--accent-2);transition:width .15s linear}
+.item{border:1px solid var(--border);border-radius:12px;padding:10px;margin-top:10px;background:#121419}
+.item h4{margin:0 0 6px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.small{color:var(--muted);font-size:12px}
+a.inline{color:#9ad5ff;text-decoration:none}
+a.inline:hover{text-decoration:underline}
+
+footer{color:var(--muted);font-size:12px;margin:28px 0;text-align:center}
+
+/* Mobile */
+@media (max-width:600px){
+  .btn{width:100%}
+  .filebox{gap:8px}
+  .brand h1{font-size:18px}
+}
+</style>
 </head>
 <body>
-  <div class="box">
-    <h1>アップロード</h1>
+<div class="container">
 
-    <!-- ===== 設定（ここだけ編集すればOK） ===== -->
-    <div class="row">
-      <label>Worker URL：</label>
-      <input id="workerInput" style="width:100%" />
+  <header class="topbar">
+    <div class="brand">
+      <h1>アップロード</h1>
+      <div class="sub">B2 経由 → NAS 連携（数日後に原本DL）</div>
     </div>
-    <!-- ===================================== -->
+    <div class="right">
+      <button class="btn ghost" id="howto">使い方</button>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="row filebox">
+      <label class="filebtn" for="file">ファイルを選ぶ（画像/動画・複数可）</label>
+      <input id="file" type="file" accept="image/*,video/*" multiple />
+      <span class="fileinfo" id="fileinfo">未選択</span>
+    </div>
 
     <div class="row">
-      <input id="file" type="file" multiple />
+      <label for="eventId">イベントID</label>
+      <input id="eventId" placeholder="例: 20251012-concertA" />
     </div>
+
     <div class="row">
-      <label>イベントID：</label>
-      <input id="eventId" placeholder="20251012-concertA" />
+      <button class="btn" id="go">アップロード開始</button>
     </div>
+
+    <div class="row" id="list"><!-- per-file status will appear here --></div>
+
     <div class="row">
-      <button id="go">アップロード開始</button>
+      <details>
+        <summary>（管理者向け）manifest 用スニペット</summary>
+        <pre id="manifestOut" class="small" style="white-space:pre-wrap;background:#0f1116;padding:10px;border-radius:10px;border:1px solid #222;"></pre>
+      </details>
     </div>
-    <div class="row">
-      <div id="bar"><div></div></div>
-      <div id="status"></div>
-      <div id="result"></div>
-    </div>
-    <hr />
-    <p>Worker: <code id="workerOrigin"></code></p>
-  </div>
+  </section>
 
-  <script>
-    /***********************
-     *  必要な設定（上部固定）
-     ***********************/
-    // ★あなたの Cloudflare Workers 本番URLに置換（例: https://taiko-worker-plain.xxx.workers.dev）
-    const DEFAULT_WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
-    // 制限など（必要に応じて変更）
-    const MAX_FILE_MB = 2048; // 例: 2GBまで
-    const DEFAULT_EXPIRES_SEC = 600;
+  <footer>© Taiko Media</footer>
+</div>
 
-    // 画面に反映
-    const workerInput = document.getElementById("workerInput");
-    workerInput.value = DEFAULT_WORKER_ORIGIN;
-    const showWorker = () => document.getElementById("workerOrigin").textContent = workerInput.value;
-    workerInput.addEventListener("input", showWorker);
-    showWorker();
+<script>
+/* ===== 設定（ここだけ編集） ===== */
+const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev"; // ← 実URLに
+/* ================================= */
 
-    // ユーティリティ
-    const pad2 = (n) => String(n).padStart(2, "0");
-    const yyyymm = (d=new Date()) => d.getFullYear() + pad2(d.getMonth()+1);
+const $ = (s,p=document)=>p.querySelector(s);
+const pad2 = n=>String(n).padStart(2,"0");
+const yyyymm = (d=new Date()) => d.getFullYear()+pad2(d.getMonth()+1);
 
-    document.getElementById("go").onclick = async () => {
-      const WORKER_ORIGIN = workerInput.value.trim();
-      if (!/^https?:\/\//.test(WORKER_ORIGIN)) {
-        alert("Worker URL が不正です"); return;
-      }
+// UI: file picker label
+$("#file").addEventListener("change", () => {
+  const f = $("#file").files;
+  if (!f || !f.length) return $("#fileinfo").textContent = "未選択";
+  let total = 0;
+  for (const x of f) total += x.size||0;
+  $("#fileinfo").textContent = `${f.length} 件・合計 ${(total/1024/1024).toFixed(1)} MB`;
+});
 
-      const files = document.getElementById("file").files;
-      const eventId = document.getElementById("eventId").value.trim() || "event-" + yyyymm();
-      if (!files.length) return alert("ファイルを選んでください。");
+// How-to
+$("#howto").addEventListener("click", ()=>{
+  alert([
+    "① 画像/動画を選択（複数可）",
+    "② イベントIDを入力（例: 20251012-concertA）",
+    "③ アップロード開始 → 数日後にNASへ自動移動（原本DLはNAS共有から）",
+    "プレビューや一時DLはカタログから可能です。"
+  ].join("\n"));
+});
 
-      const bar = document.querySelector("#bar > div");
-      const status = document.getElementById("status");
-      const result = document.getElementById("result");
-      result.innerHTML = ""; status.textContent = ""; bar.style.width = "0%";
+// Core upload
+$("#go").addEventListener("click", async ()=>{
+  const files = $("#file").files;
+  const eventId = $("#eventId").value.trim() || `event-${yyyymm()}`;
+  if (!files || !files.length) return alert("ファイルを選んでください。");
 
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
+  const list = $("#list");
+  const manifestOut = $("#manifestOut");
+  manifestOut.textContent = "";
 
-        // サイズチェック（任意）
-        if (f.size > MAX_FILE_MB * 1024 * 1024) {
-          alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue;
-        }
+  for (let i=0; i<files.length; i++){
+    const f = files[i];
+    const month = yyyymm();
+    const rand = Math.random().toString(36).slice(2,8);
+    const safeName = f.name.replace(/[^\w.\-]/g, "_");
+    const key = `staging/${month}/${eventId}/${Date.now()}_${rand}_${safeName}`;
 
-        const month = yyyymm();
-        const rand = Math.random().toString(36).slice(2, 8);
-        const safeName = f.name.replace(/[^\w.\-]/g, "_");
-        const key = `staging/${month}/${eventId}/${Date.now()}_${rand}_${safeName}`;
-        const contentType = f.type || "application/octet-stream";
+    // per-item UI
+    const item = document.createElement("div");
+    item.className = "item";
+    item.innerHTML = `
+      <h4>${safeName}</h4>
+      <div class="progress"><div></div></div>
+      <div class="small" data-status>準備中…</div>
+      <div class="small" data-links></div>
+    `;
+    list.prepend(item);
+    const bar = item.querySelector(".progress>div");
+    const status = item.querySelector("[data-status]");
+    const links = item.querySelector("[data-links]");
 
-        // === 代理PUTに切替（CORS問題を回避） ===
-        const proxyUrl = `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
+    try{
+      // 1) presign
+      const presRes = await fetch(`${WORKER_ORIGIN}/uploads/presign`,{
+        method:"POST",
+        headers:{ "content-type":"application/json" },
+        body: JSON.stringify({ key, contentType: f.type || "application/octet-stream", expires: 600 })
+      });
+      if(!presRes.ok){ throw new Error("presign failed: "+presRes.status); }
+      const { url } = await presRes.json();
 
-        // XHRで進捗表示しつつアップロード
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("POST", proxyUrl, true);
-          xhr.timeout = 120000; // 120秒でタイムアウト（必要に応じて延長可）
-        
-          xhr.upload.onprogress = (ev) => {
-            if (ev.lengthComputable) {
-              const p = Math.round((ev.loaded / ev.total) * 100);
-              bar.style.width = p + "%";
-              status.textContent = `アップロード中 ${i+1}/${files.length} ... ${p}%`;
-              console.log("progress", ev.loaded, "/", ev.total, p + "%");
-            } else {
-              console.log("progress (uncounted)", ev.loaded);
-            }
-          };
-          xhr.onreadystatechange = () => {
-            if (xhr.readyState === 2) console.log("HEADERS_RECEIVED");
-            if (xhr.readyState === 3) console.log("LOADING");
-            if (xhr.readyState === 4) console.log("DONE status", xhr.status);
-          };
-          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300)
-            ? resolve()
-            : reject(new Error("proxy PUT " + xhr.status));
-          xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
-          xhr.onerror = () => reject(new Error("proxy PUT network error"));
-          xhr.send(f);
-        });
+      // 2) PUT with progress
+      await new Promise((resolve,reject)=>{
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url, true);
+        if (f.type) xhr.setRequestHeader("Content-Type", f.type);
+        xhr.upload.onprogress = ev=>{
+          if (ev.lengthComputable){
+            const p = Math.round(ev.loaded/ev.total*100);
+            bar.style.width = p+"%";
+            status.textContent = `アップロード中… ${p}%`;
+          }
+        };
+        xhr.onload = ()=> (xhr.status>=200 && xhr.status<300)? resolve(): reject(new Error("PUT "+xhr.status));
+        xhr.onerror = ()=> reject(new Error("PUT error"));
+        xhr.send(f);
+      });
 
-        // 確認用の一時GETリンク（任意）
-        const getRes = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ key, expires: DEFAULT_EXPIRES_SEC / 2 }),
-        });
-        const { url: getUrl } = await getRes.json().catch(() => ({ url: null }));
+      // 3) GET presign for preview link
+      const getRes = await fetch(`${WORKER_ORIGIN}/files/presign-get`,{
+        method:"POST",
+        headers:{ "content-type":"application/json" },
+        body: JSON.stringify({ key, expires: 300 })
+      });
+      const { url:getUrl } = await getRes.json();
 
-        const a = document.createElement("a");
-        a.href = getUrl || "#";
-        a.textContent = `アップロード完了: ${safeName}（一時URL/数分）`;
-        a.target = "_blank";
-        const li = document.createElement("div");
-        li.appendChild(a);
-        result.appendChild(li);
-      }
-
-      status.textContent = "すべて完了！";
       bar.style.width = "100%";
-    };
-  </script>
+      status.textContent = "完了！";
+
+      // links
+      const a = document.createElement("a");
+      a.href = getUrl; a.target="_blank"; a.className="inline";
+      a.textContent = "一時URL（プレビュー・数分）を開く";
+      links.replaceChildren(a);
+
+      // manifest snippet（管理者用）
+      manifestOut.textContent += JSON.stringify({ title: safeName.replace(/\.[^.]+$/,""), key }, null, 2) + ",\n";
+
+    }catch(e){
+      console.error(e);
+      status.textContent = "エラーが発生しました";
+    }
+  }
+});
+</script>
 </body>
 </html>
