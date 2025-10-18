@@ -224,15 +224,20 @@ async function reissueUrl(item, btn){
   renderHistory(); // UI更新
 
   // 完了表示 → 少し待って解除
-  if (btn) {
-    btn.textContent = '発行済み ✓';
-    btn.setAttribute('aria-busy', 'false');
-    setTimeout(() => {
-      btn.textContent = btn._prevText || '再発行';
-      btn.disabled = false;
-    }, 1500);
+   if (btn) {
+      // 完了表示を出してロック
+      btn.textContent = '発行済み ✓';
+      btn.setAttribute('aria-busy', 'false');
+      // 1.2秒見せてから解除＆一覧を再描画
+      setTimeout(() => {
+        btn.textContent = btn._prevText || '再発行';
+        btn.disabled = false;
+        renderHistory();               // ← ここで再描画（直前に保存したURLが反映される）
+      }, 1200);
+    } else {
+      renderHistory();                 // ボタン参照が無い場合は通常通り
+    }
   }
-}
 function renderHistory(){
   const list = loadHistory().slice().reverse();
   const box = $("#result");
