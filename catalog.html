@@ -41,15 +41,28 @@
 </head>
 <body>
 <div class="container">
-  <header>
-    <h1>イベントカタログ</h1>
-    <div class="controls">
-      <!-- 設定：ここを1回だけ編集 -->
-      <input id="worker" type="text" placeholder="Worker URL" />
-      <input id="manifest" type="text" placeholder="Manifest JSON URL" />
-      <button id="load">読み込む</button>
+  <header class="topbar">
+  <div class="brand">
+    <h1>カタログ</h1>
+    <div class="sub">イベントのプレビュー & 原本ダウンロード</div>
+  </div>
+  <div class="controls">
+    <!-- Worker 表示（固定） -->
+    <div class="pill" title="Cloudflare Workers">
+      <span class="icon">🟣</span>
+      <code id="pill-worker"></code>
+      <button class="btn ghost" id="copy-worker">コピー</button>
     </div>
-  </header>
+    <!-- Manifest 表示（固定） -->
+    <div class="pill" title="読み込み中のマニフェスト">
+      <span class="icon">📄</span>
+      <code id="pill-manifest"></code>
+      <button class="btn ghost" id="open-manifest">開く</button>
+      <button class="btn ghost" id="copy-manifest">コピー</button>
+    </div>
+    <span class="badge-ok" id="badge-status">READY</span>
+  </div>
+</header>
 
   <div id="grid" class="grid"></div>
   <footer>© Taiko Media</footer>
