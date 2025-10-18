@@ -170,6 +170,8 @@ const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
 const SELF_DELETE_TTL_SEC = 30*60; // 30分（参考表示用）
 const LS_KEY = "tm/uploads/v1";    // ローカル履歴のキー
+const CANCELLED_KEEP_MS = 24 * 60 * 60 * 1000;// 取り消し済みの履歴をどれくらい残すか（ミリ秒）
+// 例: 24時間 = 24 * 60 * 60 * 1000
 
 /** ===== 便利関数 ===== */
 const $  = (s,p=document)=>p.querySelector(s);
@@ -384,15 +386,26 @@ setInterval(() => { pruneHistoryExpired(); renderHistory(); }, 60 * 1000);
 function pruneHistoryExpired(){
   const now = Date.now();
   const list = loadHistory();
-  // deleteUntil が過去 & まだ cancelled ではない → 除外
+
   const kept = list.filter(it => {
-    if (!it.deleteUntil) return true;              // 念のため
-    const expired = new Date(it.deleteUntil).getTime() <= now;
-    return !(expired && !it.cancelled);
+    // ① 取り消しトークンの期限切れ（未キャンセルの場合は除外する＝消す）
+    if (it.deleteUntil && !it.cancelled) {
+      const expired = new Date(it.deleteUntil).getTime() <= now;
+      if (expired) return false; // 履歴から消す
+    }
+
+    // ② 取り消し済みで、一定時間を超えたら除外する
+    if (it.cancelled && it.cancelledAt) {
+      const age = now - it.cancelledAt;
+      if (age >= CANCELLED_KEEP_MS) return false; // 履歴から消す
+    }
+
+    return true; // 残す
   });
+
   if (kept.length !== list.length) saveHistory(kept);
-} 
-  function removeHistoryByKey(key){
+}
+function removeHistoryByKey(key){
   const kept = loadHistory().filter(x => x.key !== key);
   saveHistory(kept);
   renderHistory();
