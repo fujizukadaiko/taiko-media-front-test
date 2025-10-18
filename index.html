@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>アップロード｜Taiko Media</title>
+<title>アップロード｜Fujizukadaiko Media</title>
 <meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
 <style>
   :root{
     /* ── 抹茶テーマ ───────────────────────── */
-    --brand:#c1d8ac;         /* 裏葉柳（主カラー） */
-    --brand-d:#a9c890;       /* 濃いめ（押下/枠線など） */
+    --brand:#a2d7dd;         /* 瓶覗（主カラー） */
+    --brand-d:#84b9cb;       /* 濃いめ（押下/枠線など）浅縹 */
     --bgpage:#ebf6f7;        /* 藍白 あいじろ（ページ地） */
     --panel:#ffffff;         /* カード背景は白 */
     --text:#1e2a1e;          /* 文字色は濃い緑がかった黒 */
     --muted:#6f7f6a;         /* サブ文字（やや薄） */
-    --border:#e6eedc;        /* カード枠の薄い緑 */
+    --border:#c1e4e9;        /* カード枠白藍 */
     --accent:#c1d8ac;        /* 既存ボタン兼用（brandと揃える） */
     --accent-2:#86c4a0;      /* プログレス/補助色（柔らかミント） */
   }
@@ -127,7 +127,7 @@
 <div class="container">
   <header class="topbar">
     <div class="brand">
-      <h1>アップロード</h1>
+      <h1>動画・画像アップロード</h1>
     </div>
     <div class="right">
       <button class="btn ghost" id="howto">使い方</button>
@@ -151,7 +151,7 @@
     </div>
 
     <div class="row" id="history-block">
-      <h3 class="hist-title">アップロード履歴 <span class="note">（一時URLは約5分）</span></h3>
+      <h3 class="hist-title">アップロード履歴 <span class="note">（一時URLの有効期間は約5分）</span></h3>
       <div id="result"></div>
     </div>
   </section>
