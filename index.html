@@ -200,44 +200,46 @@ async function reissueUrl(item, btn){
   if (btn) {
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
-    const prev = btn.textContent;
+    btn._prevText = btn.textContent;
     btn.textContent = '発行中…';
-
-    // 後で使うため保持
-    btn._prevText = prev;
   }
 
-  const res = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
-    method:"POST",
-    headers:{ "content-type":"application/json" },
-    body: JSON.stringify({ key:item.key, expires: PRESIGN_EXPIRES })
-  });
-  const { url } = await res.json();
+  try {
+    const res = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
+      method: "POST",
+      headers: { "content-type":"application/json" },
+      body: JSON.stringify({ key: item.key, expires: PRESIGN_EXPIRES })
+    });
+    const { url } = await res.json();
 
-  item.lastPresignUrl = url || "";
-  item.lastPresignAt = Date.now();
+    // localStorage 更新
+    item.lastPresignUrl = url || "";
+    item.lastPresignAt  = Date.now();
+    const list = loadHistory();
+    const idx  = list.findIndex(x => x.key === item.key);
+    if (idx >= 0) { list[idx] = item; saveHistory(list); }
 
-  const list = loadHistory();
-  const idx = list.findIndex(x=>x.key===item.key);
-  if (idx>=0){ list[idx]=item; saveHistory(list); }
-
-  renderHistory(); // UI更新
-
-  // 完了表示 → 少し待って解除
-   if (btn) {
-      // 完了表示を出してロック
+    // ★ ここでは再描画しない（ボタン表示を維持）
+    if (btn) {
       btn.textContent = '発行済み ✓';
       btn.setAttribute('aria-busy', 'false');
-      // 1.2秒見せてから解除＆一覧を再描画
-      setTimeout(() => {
+      setTimeout(() => {       // 1.2秒見せてから復帰＆再描画
         btn.textContent = btn._prevText || '再発行';
         btn.disabled = false;
-        renderHistory();               // ← ここで再描画（直前に保存したURLが反映される）
+        renderHistory();
       }, 1200);
     } else {
-      renderHistory();                 // ボタン参照が無い場合は通常通り
+      renderHistory();
+    }
+  } catch (e) {
+    console.error(e);
+    if (btn) {
+      btn.textContent = '失敗…再試行';
+      btn.disabled = false;
+      btn.setAttribute('aria-busy', 'false');
     }
   }
+}
 function renderHistory(){
   const list = loadHistory().slice().reverse();
   const box = $("#result");
@@ -359,23 +361,29 @@ document.getElementById("go").onclick = async () => {
 
   // UI初期化
   statusEl.textContent = "";
-  barFill.style.width = "0%";
+  barFill.style.width  = "0%";
   goBtn.disabled = true;
   goBtn.textContent = "アップロード中…";
 
   const total = files.length;
   let done = 0;
+  let successCount = 0;
 
-  try {
-    for (let i = 0; i < total; i++) {
-      const f = files[i];
-      if (f.size > MAX_FILE_MB * 1024 * 1024) { alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
+  for (let i = 0; i < total; i++) {
+    const f = files[i];
+
+    try {
+      if (f.size > MAX_FILE_MB * 1024 * 1024) {
+        alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`);
+        continue;
+      }
 
       statusEl.textContent = `アップロード中 ${i+1}/${total} … 0%`;
 
+      // 撮影日時から key を構成
       const { at: takenAt } = await detectTakenAt(f);
       const { ym, ymd } = ymdSegments(takenAt);
-      const rand = Math.random().toString(36).slice(2,8);
+      const rand     = Math.random().toString(36).slice(2,8);
       const safeName = f.name.replace(/[^\w.\-]/g, "_");
       const hh = pad2(takenAt.getHours()), mm = pad2(takenAt.getMinutes()), ss = pad2(takenAt.getSeconds());
       const timeSlug = `${hh}${mm}${ss}`;
@@ -395,23 +403,25 @@ document.getElementById("go").onclick = async () => {
             statusEl.textContent = `アップロード中 ${i+1}/${total} … ${p}%`;
           }
         };
-        xhr.onload   = () => { if (xhr.status>=200 && xhr.status<300) { try{ resolve(JSON.parse(xhr.responseText)); }catch{ resolve({ok:true}); } } else reject(new Error("proxy PUT " + xhr.status)); };
-        xhr.ontimeout= () => reject(new Error("proxy PUT timeout"));
-        xhr.onerror  = () => reject(new Error("proxy PUT network error"));
+        xhr.onload    = () => { (xhr.status>=200 && xhr.status<300)
+                                ? resolve(JSON.parse(xhr.responseText || "{}"))
+                                : reject(new Error("proxy PUT " + xhr.status)); };
+        xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
+        xhr.onerror   = () => reject(new Error("proxy PUT network error"));
         xhr.send(f);
       });
 
       // 一時URL 5分
       let presigned = "";
-      try{
+      try {
         const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
-          method:"POST",
-          headers:{ "content-type":"application/json" },
+          method: "POST",
+          headers: { "content-type":"application/json" },
           body: JSON.stringify({ key, expires: PRESIGN_EXPIRES })
         });
         const { url } = await pres.json();
         presigned = url || "";
-      }catch{}
+      } catch {}
 
       // 履歴へ
       addHistory({
@@ -423,23 +433,32 @@ document.getElementById("go").onclick = async () => {
         lastPresignAt: Date.now()
       });
 
+      successCount++;
+    } catch (e) {
+      console.error("upload failed:", e);
+      // ここでは落とさない（次のファイルへ）
+    } finally {
       done++;
       statusEl.textContent = `完了 ${done}/${total}`;
     }
-
-    // 完了表示 & リセット
-    statusEl.textContent = "すべて完了！";
-    barFill.style.width = "100%";
-    try { fileEl.value = ""; } catch {}
-    if (fileInfo) fileInfo.textContent = "未選択";
-
-  } catch (e) {
-    console.error(e);
-    alert("アップロードに失敗しました");
-  } finally {
-    goBtn.disabled = false;
-    goBtn.textContent = "アップロード開始";
   }
+
+  // すべてのファイル処理が終わったら、状態を整える
+  if (successCount > 0) {
+    statusEl.textContent = "すべて完了！";
+  } else {
+    statusEl.textContent = "エラーが発生しました";
+    alert("アップロードに失敗しました");  // 全滅時のみ
+  }
+
+  // 進捗と選択をリセット
+  barFill.style.width = "0%";
+  try { fileEl.value = ""; } catch {}
+  if (fileInfo) fileInfo.textContent = "未選択";
+
+  // ボタン復帰
+  goBtn.disabled = false;
+  goBtn.textContent = "アップロード開始";
 };
 
 /** 初期描画（保存済み履歴を表示） */
