@@ -121,6 +121,9 @@
     .row-actions .btn.small{ padding:8px 12px; }
   }
   .btn[disabled]{ opacity:.6; cursor:not-allowed }
+  .hist-title { margin:16px 0 6px; font-size:16px }
+  .hist-title .note { font-size:12px; color:var(--muted); margin-left:6px }
+  
 </style>
 </head>
 <body>
@@ -152,7 +155,7 @@
     </div>
 
     <div class="row" id="history-block">
-      <h3 style="margin:16px 0 6px;font-size:16px">アップロード履歴</h3>
+      <h3 class="hist-title">アップロード履歴 <span class="note">（一時URLは約5分）</span></h3>
       <div id="result"></div>
     </div>
   </section>
@@ -210,6 +213,7 @@ async function reissueUrl(item, btn){
       headers: { "content-type":"application/json" },
       body: JSON.stringify({ key: item.key, expires: PRESIGN_EXPIRES })
     });
+    if (!res.ok) throw new Error(`presign-get ${res.status}`);
     const { url } = await res.json();
 
     // localStorage 更新
@@ -220,10 +224,13 @@ async function reissueUrl(item, btn){
     if (idx >= 0) { list[idx] = item; saveHistory(list); }
 
     // ★ ここでは再描画しない（ボタン表示を維持）
+    // ★ 成功時にURLを返す
+    const updatedUrl = item.lastPresignUrl || "";
+    
     if (btn) {
       btn.textContent = '発行済み ✓';
       btn.setAttribute('aria-busy', 'false');
-      setTimeout(() => {       // 1.2秒見せてから復帰＆再描画
+      setTimeout(() => {
         btn.textContent = btn._prevText || '再発行';
         btn.disabled = false;
         renderHistory();
@@ -231,6 +238,7 @@ async function reissueUrl(item, btn){
     } else {
       renderHistory();
     }
+    return updatedUrl;   // ← これを追加
   } catch (e) {
     console.error(e);
     if (btn) {
@@ -238,6 +246,7 @@ async function reissueUrl(item, btn){
       btn.disabled = false;
       btn.setAttribute('aria-busy', 'false');
     }
+    return null;
   }
 }
 function renderHistory(){
@@ -251,9 +260,41 @@ function renderHistory(){
 
     const link = document.createElement("a");
     link.className = "hist-name";
-    link.textContent = `アップロード完了：${item.name}（一時URL/数分）`;
-    if (item.cancelled || !item.lastPresignUrl){ link.href="#"; link.classList.add("name-cancelled"); }
-    else { link.href=item.lastPresignUrl; link.target="_blank"; }
+    link.textContent = `アップロード完了：${item.name}`;
+    
+    const isExpired = () => {
+      if (!item.lastPresignUrl || !item.lastPresignAt) return true;
+      const age = Date.now() - item.lastPresignAt;
+      // ちょい余裕（2秒）を引く
+      return age >= (PRESIGN_EXPIRES * 1000 - 2000);
+    };
+    
+    if (item.cancelled || !item.lastPresignUrl){
+      link.href = "#";
+      link.classList.add("name-cancelled");
+    } else {
+      link.href = item.lastPresignUrl;
+      link.target = "_blank";
+    }
+    
+     // 期限切れなら再発行を促す
+    link.onclick = async (e) => {
+      if (item.cancelled) { e.preventDefault(); return; }
+      if (!item.lastPresignUrl || isExpired()) {
+        e.preventDefault();
+        const go = confirm("この一時URLは有効期限が切れています。新しいURLを再発行しますか？");
+        if (!go) return;
+    
+        const newUrl = await reissueUrl(item, null);
+        if (newUrl) {
+          // その場のリンクも更新しておく
+          link.href = newUrl;
+          link.target = "_blank";
+          link.classList.remove("name-cancelled");
+          window.open(newUrl, "_blank");
+        }
+      }
+    };
     row.appendChild(link);
 
     if (item.cancelled){
@@ -350,12 +391,12 @@ function pruneHistoryExpired(){
     return !(expired && !it.cancelled);
   });
   if (kept.length !== list.length) saveHistory(kept);
-}
-function removeHistoryByKey(key){
-  const list = loadHistory().filter(x => x.key !== key);
-  saveHistory(list);
-  renderHistory();
 } 
+  function removeHistoryByKey(key){
+  const kept = loadHistory().filter(x => x.key !== key);
+  saveHistory(kept);
+  renderHistory();
+}
 /** ===== 使い方 ===== */
 $("#howto").addEventListener("click", ()=>{
   alert([
