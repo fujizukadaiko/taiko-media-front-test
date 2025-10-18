@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "key": "staging/202510/20251018/photo1.jpg",
+      "title": "開演前",
+      "thumb": "https://placehold.co/400x300?text=photo1"
+    },
+    {
+      "key": "staging/202510/20251018/movie1.mp4",
+      "title": "演奏動画",
+      "thumb": "https://placehold.co/400x300?text=movie1"
+    }
+  ]
+}
