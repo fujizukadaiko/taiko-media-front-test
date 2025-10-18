@@ -4,11 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>アップロード｜Taiko Media</title>
-  <!-- iOS/Android の上下バーをダークに揃える -->
   <meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#ffffff"  media="(prefers-color-scheme: light)">
   <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
-  
   <style>
     :root{
       --bg:#0b0c10; --panel:#14161a; --text:#e6e7ea; --muted:#9aa3b2;
@@ -16,16 +14,19 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%}
+    html{background:#0a0b11}
     body{
       margin:0;
+      min-height:100svh;
       padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11);
       color:var(--text);
-      font:16px/1.6 system-ui, -apple-system, "Segoe UI", Arial;
+      font:16px/1.6 system-ui,-apple-system,"Segoe UI",Arial;
     }
+    body::before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11)}
     .container{max-width:860px;margin:24px auto;padding:0 16px}
 
-    /* Topbar（カタログと同トーン） */
+    /* Topbar */
     .topbar{
       display:flex;gap:12px;align-items:center;justify-content:space-between;
       background:linear-gradient(180deg,#111318,#0f1116);
@@ -41,7 +42,7 @@
     .btn.ghost{background:#1a1c22}
     .btn:active{transform:translateY(1px)}
 
-    /* パネル */
+    /* Panel */
     .box{
       background:var(--panel); border:1px solid var(--border);
       max-width:860px; margin:0 auto; padding:16px; border-radius:16px;
@@ -49,50 +50,35 @@
     }
     .row{margin:12px 0}
     label{display:block;margin:0 0 8px;color:#cfd4e1;font-size:14px}
-    input[type="text"]{
-      width:100%; background:#0f1116; color:var(--text);
-      border:1px solid var(--border); padding:12px; border-radius:12px; font-size:16px;
-    }
 
-    /* ファイル選択（ボタン化） */
-    .filebox{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    /* File chooser */
     input[type="file"]{display:none}
-    .filebtn{background:#1a1c22;border:1px solid var(--border);color:#e6e7ea;padding:12px 14px;border-radius:12px;cursor:pointer}
+    .filebox{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .filebtn{
+      background:#0f1116;color:#e6e7ea;padding:12px 16px;border-radius:12px;cursor:pointer;
+      border:2px solid var(--accent);  /* ← 紫アウトラインでボタン感UP */
+      box-shadow:0 0 0 1px #000 inset;
+      transition:transform .05s ease, opacity .15s ease;
+    }
+    .filebtn:hover{opacity:.95}
+    .filebtn:active{transform:translateY(1px)}
     .fileinfo{color:var(--muted);font-size:13px}
 
-    /* プログレス */
+    /* Progress */
     #bar{width:100%;height:12px;background:#101319;border:1px solid #222;border-radius:999px;overflow:hidden}
     #bar>div{height:100%;width:0;background:var(--accent-2);transition:width .15s linear}
+    #status{margin-top:8px;color:#cfd4e1}
 
-    /* 結果リンク */
+    /* Result */
     #result a{color:#9ad5ff;text-decoration:none}
     #result a:hover{text-decoration:underline}
+    #result .inline-btn{
+      margin-left:8px;font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid #394150;background:#141820;color:#e6e7ea;cursor:pointer;
+    }
+    #result .inline-btn:disabled{opacity:.5;cursor:not-allowed}
 
     footer{color:var(--muted);font-size:12px;margin:28px 0;text-align:center}
-
-    /* モバイル */
-    @media (max-width:600px){
-      .btn{width:100%}
-      .brand h1{font-size:18px}
-    }
-    /* ページ外周（角丸の外）もダークで塗る */
-    html { background:#0a0b11; }
-    
-    /* アドレスバー伸縮でも常に全高を確保（iOS向け） */
-    body { min-height: 100svh; }        /* 17+ */
-    @supports not (height: 1svh) {
-      body { min-height: 100vh; }       /* フォールバック */
-    }
-    
-    /* 安全領域の内側に余白を入れつつ、背景は下まで続く（既に入っているならそのままでOK） */
-    /* body には既に padding: env(safe-area-*) を入れてありますが、
-       念のため “背景が切れない” ように固定の裏地を敷いておきます。 */
-    body::before{
-      content:"";
-      position:fixed; inset:0; z-index:-1;
-      /* ページの背景と同じ塗り */
-      background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11);
-    }
+    @media (max-width:600px){ .btn{width:100%} .brand h1{font-size:18px} }
   </style>
 </head>
 <body>
@@ -108,22 +94,11 @@
     </header>
 
     <section class="box">
-      <!-- ===== 設定（ここだけ編集すればOK） ===== -->
-      <div class="row">
-        <label for="workerInput">Worker URL</label>
-        <input id="workerInput" type="text" placeholder="https://xxxxx.workers.dev" />
-      </div>
-      <!-- ===================================== -->
-
+      <!-- ファイル選択（イベントIDやWorker入力は撤去） -->
       <div class="row filebox">
         <label class="filebtn" for="file">ファイルを選ぶ（画像/動画・複数可）</label>
         <input id="file" type="file" accept="image/*,video/*" multiple />
         <span class="fileinfo" id="fileinfo">未選択</span>
-      </div>
-
-      <div class="row">
-        <label for="eventId">イベントID</label>
-        <input id="eventId" type="text" placeholder="例: 20251012-concertA" />
       </div>
 
       <div class="row">
@@ -132,185 +107,169 @@
 
       <div class="row">
         <div id="bar"><div></div></div>
-        <div id="status" style="margin-top:8px;color:#cfd4e1"></div>
+        <div id="status"></div>
         <div id="result" style="margin-top:6px"></div>
       </div>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0" />
-      <p style="color:var(--muted);font-size:13px">Worker: <code id="workerOrigin" style="background:#101319;padding:2px 6px;border-radius:6px;border:1px solid var(--border);color:#cfd4e1"></code></p>
     </section>
 
     <footer>© Taiko Media</footer>
   </div>
 
- <script>
-  /***********************
-   *  必要な設定（上部固定）
-   ***********************/
-  const FRONT_VERSION = "Front v1.0.2";
-  const DEFAULT_WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
-  const MAX_FILE_MB = 2048;
-  const DEFAULT_EXPIRES_SEC = 600;
+  <script>
+    /* ========= 設定（画面には出さない） ========= */
+    const DEFAULT_WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev"; // ← ここを実URLに
+    const WORKER_ORIGIN = DEFAULT_WORKER_ORIGIN;
+    const MAX_FILE_MB = 2048;
+    const DEFAULT_EXPIRES_SEC = 600;
 
-  // 画面に反映
-  const workerInput = document.getElementById("workerInput");
-  workerInput.value = DEFAULT_WORKER_ORIGIN;
-  const showWorker = () => document.getElementById("workerOrigin").textContent = workerInput.value;
-  workerInput.addEventListener("input", showWorker);
-  showWorker();
-
-  // ユーティリティ
-  const pad2 = (n) => String(n).padStart(2, "0");
-  const yyyymm = (d=new Date()) => d.getFullYear() + pad2(d.getMonth()+1);
-  const $ = (s,p=document)=>p.querySelector(s);
-
-  // How-to
-  $("#howto").addEventListener("click", ()=>{
-    alert([
-      "① 画像/動画を選択（複数可）",
-      "② イベントIDを入力（例: 20251012-concertA）",
-      "③ アップロード開始 → 数日後にNASへ自動移動（原本DLはNAS共有から）",
-      "プレビューや一時DLはカタログから可能です。"
-    ].join("\n"));
-  });
-
-  // ファイル選択表示
-  $("#file").addEventListener("change", () => {
-    const f = $("#file").files;
-    if (!f || !f.length) return $("#fileinfo").textContent = "未選択";
-    let total = 0;
-    for (const x of f) total += x.size||0;
-    $("#fileinfo").textContent = `${f.length} 件・合計 ${(total/1024/1024).toFixed(1)} MB`;
-  });
-
-  document.getElementById("go").onclick = async () => {
-    const WORKER_ORIGIN = workerInput.value.trim();
-    if (!/^https?:\/\//.test(WORKER_ORIGIN)) {
-      alert("Worker URL が不正です"); return;
+    /* ========= 小道具 ========= */
+    const $ = (s,p=document)=>p.querySelector(s);
+    const pad2 = (n)=> String(n).padStart(2,"0");
+    function ymdSegments(d=new Date()){
+      const Y=d.getFullYear(), M=pad2(d.getMonth()+1), D=pad2(d.getDate());
+      return { y:String(Y), ym:`${Y}${M}`, ymd:`${Y}${M}${D}` };
+    }
+    async function detectTakenAt(file){
+      try{
+        if (/\.(jpe?g|heic|heif|webp|tiff?)$/i.test(file.name)){
+          const exif = await exifr.parse(file,{userComment:false});
+          const d = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
+          if (d instanceof Date && !isNaN(+d)) return {at:d, source:"exif"};
+        }
+      }catch(e){ console.warn("EXIF parse failed:", e); }
+      const d2 = file.lastModified ? new Date(file.lastModified) : new Date();
+      return {at:d2, source:"lastModified"};
     }
 
-    const files = document.getElementById("file").files;
-    const eventId = document.getElementById("eventId").value.trim() || "event-" + yyyymm();
-    if (!files.length) return alert("ファイルを選んでください。");
+    /* ========= 使い方 ========= */
+    $("#howto").addEventListener("click", () => {
+      alert([
+        "① 画像/動画を選択（複数可）",
+        "② アップロード開始 → 撮影日付のフォルダに自動振り分け",
+        "③ 一時URLで確認できます。必要なら30分以内に『取り消す』が可能です。",
+        "※ 原本DLは後日NASの共有リンクから行えます。"
+      ].join("\n"));
+    });
 
-    const bar = document.querySelector("#bar > div");
-    const status = document.getElementById("status");
-    const result = document.getElementById("result");
-    result.innerHTML = ""; status.textContent = ""; bar.style.width = "0%";
+    /* ========= ファイル選択表示 ========= */
+    $("#file").addEventListener("change", () => {
+      const f = $("#file").files;
+      if (!f || !f.length) { $("#fileinfo").textContent = "未選択"; return; }
+      let total = 0; for (const x of f) total += x.size||0;
+      $("#fileinfo").textContent = `${f.length} 件・合計 ${(total/1024/1024).toFixed(1)} MB`;
+    });
 
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
+    /* ========= アップロード ========= */
+    $("#go").addEventListener("click", async () => {
+      const files = $("#file").files;
+      if (!files || !files.length) return alert("ファイルを選んでください。");
+      if (!/^https?:\/\//.test(WORKER_ORIGIN)) return alert("Worker URL が不正です");
 
-      // サイズチェック
-      if (f.size > MAX_FILE_MB * 1024 * 1024) {
-        alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue;
-      }
+      const bar = $("#bar > div");
+      const status = $("#status");
+      const result = $("#result");
+      status.textContent = ""; bar.style.width = "0%";
 
-      // 撮影日時を検出 → 自動フォルダ
-      const { at: takenAt } = await detectTakenAt(f);
-      const { ym, ymd } = ymdSegments(takenAt);
+      for (let i=0;i<files.length;i++){
+        const f = files[i];
+        if (f.size > MAX_FILE_MB*1024*1024){ alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
 
-      const subLabel = ""; // 必要なら "A" 等を入れる
-      const rand = Math.random().toString(36).slice(2,8);
-      const safeName = f.name.replace(/[^\w.\-]/g, "_");
-      const hh = pad2(takenAt.getHours()), mm = pad2(takenAt.getMinutes()), ss = pad2(takenAt.getSeconds());
-      const timeSlug = `${hh}${mm}${ss}`;
-      const baseDir = subLabel ? `staging/${ym}/${ymd}/${subLabel}` : `staging/${ym}/${ymd}`;
-      const key = `${baseDir}/${timeSlug}_${rand}_${safeName}`;
-      const contentType = f.type || "application/octet-stream";
+        // 撮影日時→自動フォルダ
+        const { at:takenAt } = await detectTakenAt(f);
+        const { ym, ymd } = ymdSegments(takenAt);
+        const hh=pad2(takenAt.getHours()), mm=pad2(takenAt.getMinutes()), ss=pad2(takenAt.getSeconds());
+        const timeSlug = `${hh}${mm}${ss}`;
+        const safeName = f.name.replace(/[^\w.\-]/g,"_");
+        const key = `staging/${ym}/${ymd}/${timeSlug}_${Math.random().toString(36).slice(2,8)}_${safeName}`;
+        const contentType = f.type || "application/octet-stream";
 
-      // === 進捗付き 代理PUT（1回だけ） ===
-      const proxyUrl = `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
-      const delInfo = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", proxyUrl, true);
-        xhr.timeout = 5 * 60 * 1000; // 5分
+        // 進捗表示つき XHR → proxy-put
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`, true);
+          xhr.timeout = 5 * 60 * 1000;
+          xhr.upload.onprogress = ev=>{
+            if (ev.lengthComputable){
+              const p = Math.round((ev.loaded/ev.total)*100);
+              bar.style.width = p + "%";
+              status.textContent = `アップロード中 ${i+1}/${files.length} ... ${p}%`;
+            }
+          };
+          xhr.onload = () => (xhr.status>=200 && xhr.status<300) ? resolve() : reject(new Error("proxy PUT "+xhr.status));
+          xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
+          xhr.onerror = () => reject(new Error("proxy PUT network error"));
+          xhr.send(f);
+        });
 
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) {
-            const p = Math.round((ev.loaded / ev.total) * 100);
-            bar.style.width = p + "%";
-            status.textContent = `アップロード中 ${i+1}/${files.length} ... ${p}%`;
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({ ok:true }); }
-          } else {
-            reject(new Error("proxy PUT " + xhr.status));
-          }
-        };
-        xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
-        xhr.onerror = () => reject(new Error("proxy PUT network error"));
-        xhr.send(f);
-      });
-      // delInfo: { ok:true, deleteToken?: "...", deleteUntil?: ISOString }
+        // proxy のJSON応答（deleteToken等）を改めて取得（小さな追撃リクエストに分離）
+        // ※ 上のXHRの応答本文を拾ってもOKですが、簡潔のため再POSTで取得します
+        const delInfoRes = await fetch(`${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`, {
+          method: "POST", body: new Blob(), // 空ボディでもOK（PUTはせずJSONを返す設計にしていない場合は省略可）
+        }).catch(()=>null);
+        let delInfo = null;
+        if (delInfoRes && delInfoRes.ok){
+          try { delInfo = await delInfoRes.json(); } catch {}
+        }
 
-      // 確認用の一時GETリンク
-      const getRes = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ key, expires: DEFAULT_EXPIRES_SEC / 2 }),
-      });
-      const { url: getUrl } = await getRes.json().catch(() => ({ url: null }));
-
-      const li = document.createElement("div");
-
-      if (getUrl) {
-        const link = document.createElement("a");
-        link.href = getUrl; link.target = "_blank";
-        link.textContent = `アップロード完了: ${safeName}（一時URL/数分）`;
-        li.appendChild(link);
-      }
-
-      if (delInfo?.deleteToken) {
-        const btn = document.createElement("button");
-        btn.textContent = "取り消す（30分以内）";
-        btn.style.marginLeft = "8px";
-        btn.onclick = async () => {
-          if (!confirm("このファイルを取り消します。よろしいですか？")) return;
-          const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ token: delInfo.deleteToken })
+        // 一時URL
+        let getUrl = null;
+        try{
+          const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`,{
+            method:"POST",
+            headers:{"content-type":"application/json"},
+            body:JSON.stringify({ key, expires: DEFAULT_EXPIRES_SEC/2 })
           });
-          const js = await res.json().catch(()=>({}));
-          if (res.ok && js.ok) {
-            btn.disabled = true; btn.textContent = "取り消しました";
-          } else {
-            alert("取り消しに失敗しました");
+          const js = await pres.json();
+          getUrl = js?.url || null;
+        }catch{}
+
+        // UI 追記
+        const line = document.createElement("div");
+        if (getUrl){
+          const a = document.createElement("a");
+          a.href = getUrl; a.target = "_blank";
+          a.textContent = `アップロード完了: ${safeName}（一時URL/数分）`;
+          line.appendChild(a);
+        }else{
+          line.textContent = `アップロード完了: ${safeName}`;
+        }
+
+        // 取り消す（30分以内）
+        if (delInfo?.deleteToken){
+          const btn = document.createElement("button");
+          btn.className = "inline-btn";
+          btn.textContent = "取り消す（30分以内）";
+          btn.onclick = async ()=>{
+            if (!confirm("このファイルを取り消します。よろしいですか？")) return;
+            const r = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
+              method:"POST",
+              headers:{"content-type":"application/json"},
+              body:JSON.stringify({ token: delInfo.deleteToken })
+            });
+            const js = await r.json().catch(()=>({}));
+            if (r.ok && js.ok){ btn.disabled = true; btn.textContent = "取り消しました"; }
+            else{ alert("取り消しに失敗しました"); }
+          };
+          line.appendChild(btn);
+
+          // 期限が来たら自動で無効化
+          if (delInfo.deleteUntil){
+            const ms = Math.max(0, new Date(delInfo.deleteUntil).getTime() - Date.now());
+            setTimeout(()=>{ btn.disabled = true; btn.textContent = "取り消し期限切れ"; }, ms);
           }
-        };
-        li.appendChild(btn);
+        }
+
+        $("#result").appendChild(line);
       }
 
-      result.appendChild(li);
-    }
+      status.textContent = "すべて完了！";
+      $("#bar > div").style.width = "100%";
 
-    status.textContent = "すべて完了！";
-    bar.style.width = "100%";
-  };
-
-  // ---------- 撮影日時の検出（画像はEXIF、動画はlastModified） ----------
-  async function detectTakenAt(file) {
-    try {
-      if (/\.(jpe?g|heic|heif|webp|tiff?)$/i.test(file.name)) {
-        const exif = await exifr.parse(file, { userComment: false });
-        const d = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
-        if (d instanceof Date && !isNaN(+d)) return { at: d, source: "exif" };
-      }
-    } catch(e) { console.warn("EXIF parse failed:", e); }
-    const d2 = file.lastModified ? new Date(file.lastModified) : new Date();
-    return { at: d2, source: "lastModified" };
-  }
-
-  // ---------- 日付セグメント ----------
-  function ymdSegments(d=new Date()){
-    const Y = d.getFullYear();
-    const M = pad2(d.getMonth()+1);
-    const D = pad2(d.getDate());
-    return { y: String(Y), ym: `${Y}${M}`, ymd: `${Y}${M}${D}` };
-  }
-</script>
+      // ✅ 選択済みファイルをリセット（同じファイルの誤再アップロード防止）
+      const fileEl = $("#file");
+      fileEl.value = "";
+      $("#fileinfo").textContent = "未選択";
+    });
+  </script>
 </body>
 </html>
