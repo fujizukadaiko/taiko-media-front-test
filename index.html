@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
   /* ===== カラーパレット（水色系） ===== */
   :root{
@@ -317,8 +318,42 @@ const LS_KEY = "tm/uploads/v1";    // ローカル履歴のキー
 const CANCELLED_KEEP_MS = 6 * 60 * 60 * 1000; // 取り消し済を残す期間
 const THRESHOLD_MB = 300;          // 300MB超→外部ブラウザ誘導
 const CATALOG_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/catalog.html";   // ←実URLに
-const STANDALONE_URL = location.href;                // ←このページ
+const STANDALONE_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/index.html";  // ←このページ
 
+/** ===== LIFF 初期化 & 外部遷移 ===== */
+const LIFF_ID = "YOUR_LIFF_ID"; // ←実IDに置換
+let liffReady = false;
+const isLine = /Line\/[\d.]+/i.test(navigator.userAgent || "");
+
+async function initLiffIfPossible(){
+  if (typeof window.liff === "undefined") return false; // SDK未ロード時
+  if (liffReady) return true;
+  try{
+    await liff.init({ liffId: LIFF_ID });
+    liffReady = true;
+  }catch(_){}
+  return liffReady;
+}
+
+async function openExternal(url){
+  if (isLine){
+    // LINE内ならLIFFのexternalで確実に外部ブラウザへ
+    await initLiffIfPossible();
+    try{
+      if (window.liff && liff.isInClient()){
+        liff.openWindow({ url, external: true });
+        return;
+      }
+    }catch(_){}
+    // 保険：同タブ遷移（_blankがブロックされることがある）
+    location.replace(url);
+    return;
+  }
+  // 通常ブラウザ
+  const w = window.open(url, "_blank");
+  if (!w) location.href = url;
+}
+  
 /** ===== 便利関数 ===== */
 const $ = (s,p=document)=>p.querySelector(s);
 const pad2 = (n)=> String(n).padStart(2,"0");
