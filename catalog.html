@@ -29,29 +29,7 @@ body{
 .brand{display:flex; gap:12px; align-items:center}
 .brand h1{font-size:20px; margin:0}
 .sub{color:var(--muted); font-size:12px}
-.controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
-
-.pill{
-  display:flex; align-items:center; gap:8px;
-  background:#101319; border:1px solid var(--border);
-  padding:8px 10px; border-radius:999px; font-size:12px;
-}
-.pill code{
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:12px; color:#cfd4e1;
-}
-.icon{opacity:.8}
-.btn{
-  background:var(--accent); color:#fff; border:none;
-  padding:8px 12px; border-radius:10px; cursor:pointer
-}
-.btn.ghost{background:#1a1c22}
-.btn:hover{opacity:.92}
-.btn:active{transform:translateY(1px)}
-.badge-ok{
-  background:#132118; color:#8BECA5; border:1px solid #1f3a29;
-  padding:3px 6px; border-radius:999px; font-size:11px
-}
+.right{display:flex;gap:8px;align-items:center}
 /* ===== ヘッダー（Topbar）ここまで ===== */
 
 /* 既存のUI（変更なし） */
@@ -60,6 +38,13 @@ input[type="text"]{background:#0f1116;color:var(--text);border:1px solid var(--b
 button{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
 button.ghost{background:#1a1c22}
 button:hover{opacity:.92}
+.btn{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:10px;cursor:pointer}
+.btn.ghost{background:#1a1c22}
+.btn:active{transform:translateY(1px)}
+.badge-ok{
+  background:#132118; color:#8BECA5; border:1px solid #1f3a29;
+  padding:3px 6px; border-radius:999px; font-size:11px
+}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgb(0 0 0 / .3)}
@@ -83,10 +68,8 @@ video, .modal-img{width:100%;max-height:70vh;object-fit:contain;background:#0f11
 
 /* レスポンシブ微調整 */
 @media (max-width:640px){
-  .pill{max-width:100%; overflow:hidden}
-  .pill code{display:inline-block; max-width:46vw; text-overflow:ellipsis; overflow:hidden; white-space:nowrap}
+  .right{flex-wrap:wrap}
 }
-  .right{display:flex;gap:8px;align-items:center}
 </style>
 </head>
 <body>
@@ -118,7 +101,7 @@ video, .modal-img{width:100%;max-height:70vh;object-fit:contain;background:#0f11
 
 <script>
 /* ===== 必要な設定（ここだけ編集） ===== */
-const WORKER_ORIGIN  = "https://taiko-worker-plain.fujizukadaiko.workers.dev"; // ← ここを実URLに
+const WORKER_ORIGIN  = "https://taiko-worker-plain.fujizukadaiko.workers.dev"; // ← 実URLに
 const MANIFEST_URL   = "https://fujizukadaiko.github.io/taiko-media-front-test/manifest/20251012-concertA.json";
 
 /* ===== ユーティリティ ===== */
@@ -131,84 +114,62 @@ function sanitizeUrl(s){
     .replace(/^"+|"+$/g,"")                 // 先頭/末尾の引用符
     .trim();
 }
-const N_WORKER = sanitizeUrl(WORKER_ORIGIN).replace(/\/+$/,"");
+const N_WORKER   = sanitizeUrl(WORKER_ORIGIN).replace(/\/+$/,"");
 const N_MANIFEST = sanitizeUrl(MANIFEST_URL);
 
-function assertUrl(u, name){
-  try { new URL(u) } catch(e){
-    alert(`${name} が不正です：\n${u}\n（全角/改行/引用符などを削除してください）`);
-    throw e;
-  }
-}
+function assertUrl(u, name){ try{ new URL(u) }catch(e){ alert(`${name} が不正です：\n${u}`); throw e; } }
 assertUrl(N_WORKER,  "WORKER_ORIGIN");
-assertUrl(N_MANIFEST, "MANIFEST_URL");
+assertUrl(N_MANIFEST,"MANIFEST_URL");
 
-const normalizeUrl = (s) => s; // 既に sanitize 済み
 const joinPath = (base, path) => base.replace(/\/+$/,"") + path;
-
 const qs = (s, p=document) => p.querySelector(s);
 const el = (t, c) => Object.assign(document.createElement(t), c);
 const isVideo = (name='') => /\.(mp4|mov|webm)$/i.test(name);
 
-async function loadManifest() {
-  console.log("MANIFEST_URL =", N_MANIFEST);
+async function loadManifest(){
   const res = await fetch(N_MANIFEST);
   if (!res.ok) throw new Error("manifest fetch failed: " + res.status);
   return await res.json();
 }
 
 function openViewer(title, url, video=false){
-  try {
+  try{
     const dlg = qs("#viewer");
     qs("#v-title").textContent = title;
     const box = qs("#v-container"); box.innerHTML = "";
-    if (video) {
+    if (video){
       const v = el("video", { controls:true }); v.src = url; box.appendChild(v);
-    } else {
+    }else{
       const img = el("img", { className:"modal-img", alt:title }); img.src = url; box.appendChild(img);
     }
     dlg.showModal();
-  } catch(e) {
-    console.error(e);
-    window.open(url, "_blank");
+  }catch(e){
+    console.error(e); window.open(url, "_blank");
   }
 }
 
-/* ===== 初期化（ヘッダーだけ上書きせずに値を流し込む） ===== */
 document.addEventListener("DOMContentLoaded", async () => {
-  // ヘッダーのピルに表示
-  const $w = document.getElementById("pill-worker");
-  const $m = document.getElementById("pill-manifest");
-  const $badge = document.getElementById("badge-status");
+  // ヘッダーのボタン
   document.getElementById("open-manifest")?.addEventListener("click", () => {
     window.open(N_MANIFEST, "_blank");
   });
+  const badge = document.getElementById("badge-status");
 
-  // ヘッダーのボタン動作
-  document.getElementById("copy-worker")?.addEventListener("click", async () => {
-    await navigator.clipboard.writeText(N_WORKER);
-  });
-  document.getElementById("copy-manifest")?.addEventListener("click", async () => {
-    await navigator.clipboard.writeText(N_MANIFEST);
-  });
-  document.getElementById("open-manifest")?.addEventListener("click", () => {
-    window.open(N_MANIFEST, "_blank");
-  });
-
-  // マニフェスト読込
+  // マニフェスト読込 → グリッド描画
   try {
-  const data = await loadManifest();
-  if ($badge) $badge.textContent = "LOADED";
+    const data = await loadManifest();
+    if (badge) badge.textContent = "LOADED";
 
     const grid = qs("#grid"); grid.innerHTML = "";
     for (const item of (data.items || [])) {
       const card = el("div", { className:"card" });
+
       const img = el("img", { className:"thumb", alt:item.title || "" });
       img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
       card.appendChild(img);
 
       const meta = el("div", { className:"meta" });
-      meta.appendChild(el("div", { className:"title", textContent:item.title || item.key?.split("/").pop() || "" }));
+      meta.appendChild(el("div", { className:"title", textContent: item.title || (item.key?.split("/").pop() || "") }));
 
       const badges = el("div", { className:"badges" });
       badges.appendChild(el("span", { className:"badge", textContent: isVideo(item.key) ? "video" : "image" }));
@@ -217,49 +178,39 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const actions = el("div", { className:"actions" });
 
-      // プレビュー（B2の一時URL）
+      // プレビュー（B2 presign GET）
       const btnView = el("button", { className:"view", textContent:"プレビュー" });
       btnView.onclick = async () => {
-        try {
-          const urlPresign = joinPath(N_WORKER, "/files/presign-get");
-          const pres = await fetch(urlPresign, {
+        try{
+          const pres = await fetch(joinPath(N_WORKER, "/files/presign-get"), {
             method:"POST",
-            headers: { "content-type":"application/json" },
+            headers:{ "content-type":"application/json" },
             body: JSON.stringify({ key: item.key, expires: 300 })
           });
           const { url } = await pres.json();
           if (!url) throw new Error("presign-get returned empty url");
           openViewer(item.title || "", url, isVideo(item.key));
-        } catch (e) {
-          console.error(e);
-          alert("プレビュー用URLの発行に失敗しました");
-        }
+        }catch(e){ console.error(e); alert("プレビュー用URLの発行に失敗しました"); }
       };
       actions.appendChild(btnView);
 
-      // 原本DL（NAS>優先 / フォールバックはB2一時URL）
+      // 原本DL（NAS優先／なければB2 presign GET with attachment）
       const aDL = el("a", { className:"dl", target:"_blank", textContent:"原本DL" });
       if (item.nasLink && /^https?:\/\//.test(item.nasLink)) {
         aDL.href = item.nasLink;
       } else {
-        aDL.onclick = async (e) => {
-          e.preventDefault();
-          try {
-            const urlPresign = joinPath(N_WORKER, "/files/presign-get");
-            const pres = await fetch(urlPresign, {
+        aDL.onclick = async (ev) => {
+          ev.preventDefault();
+          try{
+            const pres = await fetch(joinPath(N_WORKER, "/files/presign-get"), {
               method:"POST",
-              headers: { "content-type":"application/json" },
+              headers:{ "content-type":"application/json" },
               body: JSON.stringify({ key: item.key, expires: 300, attachment: true })
             });
             const { url } = await pres.json();
             if (!url) throw new Error("presign-get returned empty url");
             window.open(url, "_blank");
-          } catch (e) {
-            console.error(e);
-            if ($badge) $badge.textContent = "ERROR";
-            alert("マニフェストの読み込みに失敗しました。\nURLや公開状態を確認してください。");
-          }
-          }
+          }catch(e){ console.error(e); alert("ダウンロード用URLの発行に失敗しました"); }
         };
       }
       actions.appendChild(aDL);
@@ -269,7 +220,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       grid.appendChild(card);
     }
 
-    // フォルダ全体のNAS共有があれば目立つ場所に
+    // フォルダ全体のNAS共有
     if (data.folderNasLink && /^https?:\/\//.test(data.folderNasLink)) {
       const bar = el("div", { className:"card", style:"padding:12px;border:1px dashed #2a2e38" });
       const link = el("a", { className:"dl", href:data.folderNasLink, target:"_blank", textContent:"フォルダごとダウンロード（NAS共有）" });
@@ -278,9 +229,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   } catch (e) {
     console.error(e);
-    if ($badge) { $badge.textContent = "ERROR"; }
+    if (badge) badge.textContent = "ERROR";
     alert("マニフェストの読み込みに失敗しました。\nURLや公開状態を確認してください。");
   }
+
+  // モーダルの閉じる
+  document.getElementById("v-close")?.addEventListener("click", () => {
+    document.getElementById("viewer")?.close();
+  });
 });
 </script>
 </body>
