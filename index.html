@@ -1,275 +1,358 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>アップロード｜Taiko Media</title>
-  <meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff"  media="(prefers-color-scheme: light)">
-  <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
-  <style>
-    :root{
-      --bg:#0b0c10; --panel:#14161a; --text:#e6e7ea; --muted:#9aa3b2;
-      --accent:#7c5cff; --accent-2:#2dd4bf; --border:#22252c;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    html{background:#0a0b11}
-    body{
-      margin:0;
-      min-height:100svh;
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-      background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11);
-      color:var(--text);
-      font:16px/1.6 system-ui,-apple-system,"Segoe UI",Arial;
-    }
-    body::before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11)}
-    .container{max-width:860px;margin:24px auto;padding:0 16px}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>アップロード｜Taiko Media</title>
+<meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
+<style>
+  :root{
+    /* パステル寄せの色に微調整 */
+    --bg:#0b0c10; --panel:#14161a; --text:#e6e7ea; --muted:#9aa3b2;
+    --accent:#a89cff;      /* 柔らかい紫 */
+    --accent-2:#86e3cf;    /* 柔らかいミント */
+    --accent-2-d:#6ccbb7;  /* ミント濃いめ（押下/枠線など） */
+    --border:#22252c;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  html{background:#0a0b11}
+  body{
+    margin:0;
+    min-height:100svh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11);
+    color:var(--text);
+    font:16px/1.6 system-ui, -apple-system, "Segoe UI", Arial;
+  }
+  body::before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11)}
 
-    /* Topbar */
-    .topbar{
-      display:flex;gap:12px;align-items:center;justify-content:space-between;
-      background:linear-gradient(180deg,#111318,#0f1116);
-      border:1px solid var(--border);
-      padding:12px 14px;border-radius:14px;margin:12px 0 20px;
-      box-shadow:0 6px 24px rgb(0 0 0 / .25);
-    }
-    .brand{display:flex;gap:12px;align-items:center}
-    .brand h1{font-size:20px;margin:0}
-    .sub{color:var(--muted);font-size:12px}
-    .right{display:flex;gap:8px;align-items:center}
-    .btn{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
-    .btn.ghost{background:#1a1c22}
-    .btn:active{transform:translateY(1px)}
+  .container{max-width:860px;margin:24px auto;padding:0 16px}
+  .topbar{
+    display:flex;gap:12px;align-items:center;justify-content:space-between;
+    background:linear-gradient(180deg,#111318,#0f1116);
+    border:1px solid var(--border);
+    padding:12px 14px;border-radius:14px;margin:12px 0 20px;
+    box-shadow:0 6px 24px rgb(0 0 0 / .25);
+  }
+  .brand{display:flex;gap:12px;align-items:center}
+  .brand h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:12px}
+  .right{display:flex;gap:8px;align-items:center}
+  .btn{background:var(--accent);color:#0b0c10;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+  .btn.ghost{background:#1a1c22;color:#e6e7ea;border:1px solid var(--border)}
+  .btn.small{padding:6px 10px;font-size:13px;border-radius:999px}
+  .btn:active{transform:translateY(1px)}
 
-    /* Panel */
-    .box{
-      background:var(--panel); border:1px solid var(--border);
-      max-width:860px; margin:0 auto; padding:16px; border-radius:16px;
-      box-shadow:0 8px 30px rgb(0 0 0 / .3);
-    }
-    .row{margin:12px 0}
-    label{display:block;margin:0 0 8px;color:#cfd4e1;font-size:14px}
+  .box{
+    background:var(--panel); border:1px solid var(--border);
+    max-width:860px; margin:0 auto; padding:16px; border-radius:16px;
+    box-shadow:0 8px 30px rgb(0 0 0 / .3);
+  }
+  .row{margin:12px 0}
+  label{display:block;margin:0 0 8px;color:#cfd4e1;font-size:14px}
 
-    /* File chooser */
-    input[type="file"]{display:none}
-    .filebox{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .filebtn{
-      background:#0f1116;color:#e6e7ea;padding:12px 16px;border-radius:12px;cursor:pointer;
-      border:2px solid var(--accent);  /* ← 紫アウトラインでボタン感UP */
-      box-shadow:0 0 0 1px #000 inset;
-      transition:transform .05s ease, opacity .15s ease;
-    }
-    .filebtn:hover{opacity:.95}
-    .filebtn:active{transform:translateY(1px)}
-    .fileinfo{color:var(--muted);font-size:13px}
+  /* ファイルボタンを視認性UP（枠線つき） */
+  .filebox{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  input[type="file"]{display:none}
+  .filebtn{
+    background:#14161a;border:2px solid var(--accent);color:#e6e7ea;
+    padding:12px 14px;border-radius:12px;cursor:pointer;
+    outline:1px solid rgba(168,156,255,.15);
+    box-shadow:0 6px 14px rgba(168,156,255,.12) inset, 0 6px 16px rgba(0,0,0,.25);
+  }
+  .filebtn:hover{filter:brightness(1.05)}
+  .fileinfo{color:var(--muted);font-size:13px}
 
-    /* Progress */
-    #bar{width:100%;height:12px;background:#101319;border:1px solid #222;border-radius:999px;overflow:hidden}
-    #bar>div{height:100%;width:0;background:var(--accent-2);transition:width .15s linear}
-    #status{margin-top:8px;color:#cfd4e1}
+  /* プログレス */
+  #bar{width:100%;height:12px;background:#101319;border:1px solid #1e232a;border-radius:999px;overflow:hidden}
+  #bar>div{height:100%;width:0;background:var(--accent-2);transition:width .15s linear}
 
-    /* Result */
-    #result a{color:#9ad5ff;text-decoration:none}
-    #result a:hover{text-decoration:underline}
-    #result .inline-btn{
-      margin-left:8px;font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid #394150;background:#141820;color:#e6e7ea;cursor:pointer;
-    }
-    #result .inline-btn:disabled{opacity:.5;cursor:not-allowed}
+  #result a{color:#9ad5ff;text-decoration:none}
+  #result a:hover{text-decoration:underline}
 
-    footer{color:var(--muted);font-size:12px;margin:28px 0;text-align:center}
-    @media (max-width:600px){ .btn{width:100%} .brand h1{font-size:18px} }
-  </style>
+  .item-row{padding:10px 0;border-bottom:1px dashed #2a2e38}
+  .row-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;
+        border:1px solid #2a2e38;background:#101319;color:#cfd4e1;font-size:12px}
+
+  footer{color:var(--muted);font-size:12px;margin:28px 0;text-align:center}
+  @media (max-width:600px){
+    .btn{width:100%}
+    .brand h1{font-size:18px}
+  }
+</style>
 </head>
 <body>
-  <div class="container">
-    <header class="topbar">
-      <div class="brand">
-        <h1>アップロード</h1>
-        <div class="sub">B2 経由 → NAS 連携（数日後に原本DL）</div>
-      </div>
-      <div class="right">
-        <button class="btn ghost" id="howto">使い方</button>
-      </div>
-    </header>
+<div class="container">
+  <header class="topbar">
+    <div class="brand">
+      <h1>アップロード</h1>
+      <div class="sub">B2 経由 → NAS 連携（数日後に原本DL）</div>
+    </div>
+    <div class="right">
+      <button class="btn ghost" id="howto">使い方</button>
+    </div>
+  </header>
 
-    <section class="box">
-      <!-- ファイル選択（イベントIDやWorker入力は撤去） -->
-      <div class="row filebox">
-        <label class="filebtn" for="file">ファイルを選ぶ（画像/動画・複数可）</label>
-        <input id="file" type="file" accept="image/*,video/*" multiple />
-        <span class="fileinfo" id="fileinfo">未選択</span>
-      </div>
+  <section class="box">
+    <div class="row filebox">
+      <label class="filebtn" for="file">ファイルを選ぶ（画像/動画・複数可）</label>
+      <input id="file" type="file" accept="image/*,video/*" multiple />
+      <span class="fileinfo" id="fileinfo">未選択</span>
+    </div>
 
-      <div class="row">
-        <button class="btn" id="go">アップロード開始</button>
-      </div>
+    <div class="row">
+      <button class="btn" id="go">アップロード開始</button>
+    </div>
 
-      <div class="row">
-        <div id="bar"><div></div></div>
-        <div id="status"></div>
-        <div id="result" style="margin-top:6px"></div>
-      </div>
-    </section>
+    <div class="row">
+      <div id="bar"><div></div></div>
+      <div id="status" style="margin-top:8px;color:#cfd4e1"></div>
+    </div>
 
-    <footer>© Taiko Media</footer>
-  </div>
+    <div class="row" id="history-block">
+      <h3 style="margin:16px 0 6px;font-size:16px">アップロード履歴</h3>
+      <div id="result"></div>
+    </div>
+  </section>
 
-  <script>
-    /* ========= 設定（画面には出さない） ========= */
-    const DEFAULT_WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev"; // ← ここを実URLに
-    const WORKER_ORIGIN = DEFAULT_WORKER_ORIGIN;
-    const MAX_FILE_MB = 2048;
-    const DEFAULT_EXPIRES_SEC = 600;
+  <footer>© Taiko Media</footer>
+</div>
 
-    /* ========= 小道具 ========= */
-    const $ = (s,p=document)=>p.querySelector(s);
-    const pad2 = (n)=> String(n).padStart(2,"0");
-    function ymdSegments(d=new Date()){
-      const Y=d.getFullYear(), M=pad2(d.getMonth()+1), D=pad2(d.getDate());
-      return { y:String(Y), ym:`${Y}${M}`, ymd:`${Y}${M}${D}` };
+<script>
+/** ===== 設定（ここだけ変更） ===== */
+const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
+const MAX_FILE_MB = 2048;
+const PRESIGN_EXPIRES = 300;       // 一時URL 5分
+const SELF_DELETE_TTL_SEC = 30*60; // 30分（参考表示用）
+const LS_KEY = "tm/uploads/v1";    // ローカル履歴のキー
+
+/** ===== 便利関数 ===== */
+const $  = (s,p=document)=>p.querySelector(s);
+const pad2 = (n)=> String(n).padStart(2,"0");
+function ymdSegments(d=new Date()){
+  const Y=d.getFullYear(), M=pad2(d.getMonth()+1), D=pad2(d.getDate());
+  return { y:`${Y}`, ym:`${Y}${M}`, ymd:`${Y}${M}${D}` };
+}
+async function detectTakenAt(file){
+  try{
+    if (/\.(jpe?g|heic|heif|webp|tiff?)$/i.test(file.name)) {
+      const exif = await exifr.parse(file, { userComment:false });
+      const d = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
+      if (d instanceof Date && !isNaN(+d)) return { at:d, source:"exif" };
     }
-    async function detectTakenAt(file){
-      try{
-        if (/\.(jpe?g|heic|heif|webp|tiff?)$/i.test(file.name)){
-          const exif = await exifr.parse(file,{userComment:false});
-          const d = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
-          if (d instanceof Date && !isNaN(+d)) return {at:d, source:"exif"};
-        }
-      }catch(e){ console.warn("EXIF parse failed:", e); }
-      const d2 = file.lastModified ? new Date(file.lastModified) : new Date();
-      return {at:d2, source:"lastModified"};
-    }
+  }catch(e){ console.warn("EXIF parse failed:", e); }
+  return { at: file.lastModified ? new Date(file.lastModified) : new Date(), source:"lastModified" };
+}
 
-    /* ========= 使い方 ========= */
-    $("#howto").addEventListener("click", () => {
-      alert([
-        "① 画像/動画を選択（複数可）",
-        "② アップロード開始 → 撮影日付のフォルダに自動振り分け",
-        "③ 一時URLで確認できます。必要なら30分以内に『取り消す』が可能です。",
-        "※ 原本DLは後日NASの共有リンクから行えます。"
-      ].join("\n"));
-    });
+/** ===== 履歴の保存・描画 ===== */
+function loadHistory(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch{ return []; }
+}
+function saveHistory(list){
+  localStorage.setItem(LS_KEY, JSON.stringify(list.slice(-200))); // 直近200件くらい保持
+}
+function addHistory(entry){
+  const list = loadHistory();
+  list.push(entry);
+  saveHistory(list);
+  renderHistory();
+}
+function removeHistoryByKey(key){
+  const list = loadHistory().filter(x=>x.key!==key);
+  saveHistory(list);
+  renderHistory();
+}
+function fmtRemain(ms){
+  if (ms<=0) return "期限切れ";
+  const m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000);
+  return `${m}分${pad2(s)}秒`;
+}
+async function reissueUrl(item, $row){
+  const res = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
+    method:"POST",
+    headers:{ "content-type":"application/json" },
+    body: JSON.stringify({ key:item.key, expires: PRESIGN_EXPIRES })
+  });
+  const { url } = await res.json();
+  item.lastPresignUrl = url || "";
+  item.lastPresignAt = Date.now();
+  const list = loadHistory();
+  const idx = list.findIndex(x=>x.key===item.key);
+  if (idx>=0){ list[idx]=item; saveHistory(list); }
+  renderHistory(); // 再描画
+}
+function renderHistory(){
+  const list = loadHistory().slice().reverse(); // 新しい順
+  const box = $("#result");
+  box.innerHTML = "";
+  for (const item of list){
+    const row = document.createElement("div");
+    row.className = "item-row";
 
-    /* ========= ファイル選択表示 ========= */
-    $("#file").addEventListener("change", () => {
-      const f = $("#file").files;
-      if (!f || !f.length) { $("#fileinfo").textContent = "未選択"; return; }
-      let total = 0; for (const x of f) total += x.size||0;
-      $("#fileinfo").textContent = `${f.length} 件・合計 ${(total/1024/1024).toFixed(1)} MB`;
-    });
+    const link = document.createElement("a");
+    link.textContent = `アップロード完了：${item.name}（一時URL/数分）`;
+    link.href = item.lastPresignUrl || "#";
+    link.target = "_blank";
+    row.appendChild(link);
 
-    /* ========= アップロード ========= */
-    $("#go").addEventListener("click", async () => {
-      const files = $("#file").files;
-      if (!files || !files.length) return alert("ファイルを選んでください。");
-      if (!/^https?:\/\//.test(WORKER_ORIGIN)) return alert("Worker URL が不正です");
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
 
-      const bar = $("#bar > div");
-      const status = $("#status");
-      const result = $("#result");
-      status.textContent = ""; bar.style.width = "0%";
+    // 再発行
+    const btnRe = document.createElement("button");
+    btnRe.className = "btn small ghost";
+    btnRe.textContent = "再発行";
+    btnRe.onclick = ()=> reissueUrl(item, row);
+    actions.appendChild(btnRe);
 
-      for (let i=0;i<files.length;i++){
-        const f = files[i];
-        if (f.size > MAX_FILE_MB*1024*1024){ alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
+    // 取り消し（残り時間表示）
+    if (item.deleteToken && item.deleteUntil){
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      const remainSpan = document.createElement("span");
+      const updateRemain = ()=>{
+        const ms = new Date(item.deleteUntil).getTime() - Date.now();
+        remainSpan.textContent = `残り ${fmtRemain(ms)}`;
+      };
+      updateRemain();
+      const timer = setInterval(()=>{
+        updateRemain();
+        if (Date.now() > new Date(item.deleteUntil).getTime()) clearInterval(timer);
+      }, 1000);
 
-        // 撮影日時→自動フォルダ
-        const { at:takenAt } = await detectTakenAt(f);
-        const { ym, ymd } = ymdSegments(takenAt);
-        const hh=pad2(takenAt.getHours()), mm=pad2(takenAt.getMinutes()), ss=pad2(takenAt.getSeconds());
-        const timeSlug = `${hh}${mm}${ss}`;
-        const safeName = f.name.replace(/[^\w.\-]/g,"_");
-        const key = `staging/${ym}/${ymd}/${timeSlug}_${Math.random().toString(36).slice(2,8)}_${safeName}`;
-        const contentType = f.type || "application/octet-stream";
-
-        // 進捗表示つき XHR → proxy-put
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("POST", `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`, true);
-          xhr.timeout = 5 * 60 * 1000;
-          xhr.upload.onprogress = ev=>{
-            if (ev.lengthComputable){
-              const p = Math.round((ev.loaded/ev.total)*100);
-              bar.style.width = p + "%";
-              status.textContent = `アップロード中 ${i+1}/${files.length} ... ${p}%`;
-            }
-          };
-          xhr.onload = () => (xhr.status>=200 && xhr.status<300) ? resolve() : reject(new Error("proxy PUT "+xhr.status));
-          xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
-          xhr.onerror = () => reject(new Error("proxy PUT network error"));
-          xhr.send(f);
+      const btnDel = document.createElement("button");
+      btnDel.className = "btn small";
+      btnDel.style.background = "var(--accent-2)";
+      btnDel.style.color = "#0b0c10";
+      btnDel.textContent = "取り消す";
+      btnDel.onclick = async ()=>{
+        if (!confirm("このファイルを取り消します。よろしいですか？")) return;
+        const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
+          method:"POST",
+          headers:{ "content-type":"application/json" },
+          body: JSON.stringify({ token:item.deleteToken })
         });
-
-        // proxy のJSON応答（deleteToken等）を改めて取得（小さな追撃リクエストに分離）
-        // ※ 上のXHRの応答本文を拾ってもOKですが、簡潔のため再POSTで取得します
-        const delInfoRes = await fetch(`${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`, {
-          method: "POST", body: new Blob(), // 空ボディでもOK（PUTはせずJSONを返す設計にしていない場合は省略可）
-        }).catch(()=>null);
-        let delInfo = null;
-        if (delInfoRes && delInfoRes.ok){
-          try { delInfo = await delInfoRes.json(); } catch {}
-        }
-
-        // 一時URL
-        let getUrl = null;
-        try{
-          const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`,{
-            method:"POST",
-            headers:{"content-type":"application/json"},
-            body:JSON.stringify({ key, expires: DEFAULT_EXPIRES_SEC/2 })
-          });
-          const js = await pres.json();
-          getUrl = js?.url || null;
-        }catch{}
-
-        // UI 追記
-        const line = document.createElement("div");
-        if (getUrl){
-          const a = document.createElement("a");
-          a.href = getUrl; a.target = "_blank";
-          a.textContent = `アップロード完了: ${safeName}（一時URL/数分）`;
-          line.appendChild(a);
+        const js = await res.json().catch(()=>({}));
+        if (res.ok && js.ok){
+          btnDel.disabled = true; btnDel.textContent = "取り消しました";
+          // ローカル履歴も更新（リンク無効化）
+          item.lastPresignUrl = "";
+          saveHistory(loadHistory().map(x=> x.key===item.key ? item : x ));
+          renderHistory();
         }else{
-          line.textContent = `アップロード完了: ${safeName}`;
+          alert("取り消しに失敗しました");
         }
+      };
+      pill.appendChild(btnDel);
+      pill.appendChild(remainSpan);
+      actions.appendChild(pill);
+    }
+    row.appendChild(actions);
+    box.appendChild(row);
+  }
+}
 
-        // 取り消す（30分以内）
-        if (delInfo?.deleteToken){
-          const btn = document.createElement("button");
-          btn.className = "inline-btn";
-          btn.textContent = "取り消す（30分以内）";
-          btn.onclick = async ()=>{
-            if (!confirm("このファイルを取り消します。よろしいですか？")) return;
-            const r = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
-              method:"POST",
-              headers:{"content-type":"application/json"},
-              body:JSON.stringify({ token: delInfo.deleteToken })
-            });
-            const js = await r.json().catch(()=>({}));
-            if (r.ok && js.ok){ btn.disabled = true; btn.textContent = "取り消しました"; }
-            else{ alert("取り消しに失敗しました"); }
-          };
-          line.appendChild(btn);
+/** ===== 使い方 ===== */
+$("#howto").addEventListener("click", ()=>{
+  alert([
+    "① 画像/動画を選択（複数可）",
+    "② 「アップロード開始」",
+    "③ 一覧に結果が残ります（再読み込みしてもOK）",
+    "・一時URLは5分。必要なら「再発行」を押してください",
+    "・誤アップは30分以内なら「取り消す」で自己撤回できます"
+  ].join("\n"));
+});
 
-          // 期限が来たら自動で無効化
-          if (delInfo.deleteUntil){
-            const ms = Math.max(0, new Date(delInfo.deleteUntil).getTime() - Date.now());
-            setTimeout(()=>{ btn.disabled = true; btn.textContent = "取り消し期限切れ"; }, ms);
-          }
+/** ===== ファイル選択表示 ===== */
+$("#file").addEventListener("change", () => {
+  const f = $("#file").files;
+  if (!f || !f.length) return $("#fileinfo").textContent = "未選択";
+  let total = 0; for (const x of f) total += x.size||0;
+  $("#fileinfo").textContent = `${f.length} 件・合計 ${(total/1024/1024).toFixed(1)} MB`;
+});
+
+/** ===== メイン：アップロード ===== */
+document.getElementById("go").onclick = async () => {
+  const files = document.getElementById("file").files;
+  if (!files.length) return alert("ファイルを選んでください。");
+
+  const bar = document.querySelector("#bar > div");
+  const status = document.getElementById("status");
+  bar.style.width = "0%"; status.textContent = ""; 
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (f.size > MAX_FILE_MB * 1024 * 1024) { alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
+
+    const { at: takenAt } = await detectTakenAt(f);
+    const { ym, ymd } = ymdSegments(takenAt);
+    const hh = pad2(takenAt.getHours()), mm = pad2(takenAt.getMinutes()), ss = pad2(takenAt.getSeconds());
+    const timeSlug = `${hh}${mm}${ss}`;
+    const rand = Math.random().toString(36).slice(2,8);
+    const safeName = f.name.replace(/[^\w.\-]/g, "_");
+    const key = `staging/${ym}/${ymd}/${timeSlug}_${rand}_${safeName}`;
+    const contentType = f.type || "application/octet-stream";
+
+    // 進捗付き POST → Worker が B2 に代理PUTし、削除トークンを返す
+    const delInfo = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`, true);
+      xhr.timeout = 5*60*1000;
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) {
+          const p = Math.round((ev.loaded/ev.total)*100);
+          bar.style.width = p + "%";
+          status.textContent = `アップロード中 ${i+1}/${files.length} … ${p}%`;
         }
-
-        $("#result").appendChild(line);
-      }
-
-      status.textContent = "すべて完了！";
-      $("#bar > div").style.width = "100%";
-
-      // ✅ 選択済みファイルをリセット（同じファイルの誤再アップロード防止）
-      const fileEl = $("#file");
-      fileEl.value = "";
-      $("#fileinfo").textContent = "未選択";
+      };
+      xhr.onload = () => {
+        if (xhr.status>=200 && xhr.status<300){
+          try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({ ok:true }); }
+        } else reject(new Error("proxy PUT " + xhr.status));
+      };
+      xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
+      xhr.onerror   = () => reject(new Error("proxy PUT network error"));
+      xhr.send(f);
     });
-  </script>
+
+    // 一時URL（5分）を発行
+    let presigned = "";
+    try{
+      const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
+        method:"POST",
+        headers:{ "content-type":"application/json" },
+        body: JSON.stringify({ key, expires: PRESIGN_EXPIRES })
+      });
+      const { url } = await pres.json();
+      presigned = url || "";
+    }catch{}
+
+    // 履歴に保存（再読み込みしても残る）
+    addHistory({
+      key, name: safeName,
+      deleteToken: delInfo?.deleteToken || null,
+      deleteUntil: delInfo?.deleteUntil || null,
+      createdAt: Date.now(),
+      lastPresignUrl: presigned,
+      lastPresignAt: Date.now()
+    });
+  }
+
+  status.textContent = "すべて完了！";
+  bar.style.width = "100%";
+
+  // ✅ アップ後に入力をリセット（同じファイルの連投を防止）
+  const picker = document.getElementById("file");
+  picker.value = "";                     // file input クリア
+  $("#fileinfo").textContent = "未選択";
+};
+
+/** 初期描画（保存済み履歴を表示） */
+renderHistory();
+</script>
 </body>
 </html>
