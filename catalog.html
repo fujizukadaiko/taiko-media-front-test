@@ -86,32 +86,21 @@ video, .modal-img{width:100%;max-height:70vh;object-fit:contain;background:#0f11
   .pill{max-width:100%; overflow:hidden}
   .pill code{display:inline-block; max-width:46vw; text-overflow:ellipsis; overflow:hidden; white-space:nowrap}
 }
+  .right{display:flex;gap:8px;align-items:center}
 </style>
 </head>
 <body>
 <div class="container">
   <header class="topbar">
-  <div class="brand">
-    <h1>カタログ</h1>
-    <div class="sub">イベントのプレビュー & 原本ダウンロード</div>
-  </div>
-  <div class="controls">
-    <!-- Worker 表示（固定） -->
-    <div class="pill" title="Cloudflare Workers">
-      <span class="icon">🟣</span>
-      <code id="pill-worker"></code>
-      <button class="btn ghost" id="copy-worker">コピー</button>
+    <div class="brand">
+      <h1>カタログ</h1>
+      <div class="sub">イベントのプレビュー & 原本ダウンロード</div>
     </div>
-    <!-- Manifest 表示（固定） -->
-    <div class="pill" title="読み込み中のマニフェスト">
-      <span class="icon">📄</span>
-      <code id="pill-manifest"></code>
-      <button class="btn ghost" id="open-manifest">開く</button>
-      <button class="btn ghost" id="copy-manifest">コピー</button>
+    <div class="right">
+      <span class="badge-ok" id="badge-status">READY</span>
+      <button class="btn ghost" id="open-manifest">マニフェスト</button>
     </div>
-    <span class="badge-ok" id="badge-status">READY</span>
-  </div>
-</header>
+  </header>
 
   <div id="grid" class="grid"></div>
   <footer>© Taiko Media</footer>
@@ -191,8 +180,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $w = document.getElementById("pill-worker");
   const $m = document.getElementById("pill-manifest");
   const $badge = document.getElementById("badge-status");
-  if ($w) $w.textContent = N_WORKER;
-  if ($m) $m.textContent = N_MANIFEST;
+  document.getElementById("open-manifest")?.addEventListener("click", () => {
+    window.open(N_MANIFEST, "_blank");
+  });
 
   // ヘッダーのボタン動作
   document.getElementById("copy-worker")?.addEventListener("click", async () => {
@@ -207,8 +197,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // マニフェスト読込
   try {
-    const data = await loadManifest(); // { eventId, folderNasLink?, items: [...] }
-    if ($badge) { $badge.textContent = "LOADED"; }
+  const data = await loadManifest();
+  if ($badge) $badge.textContent = "LOADED";
 
     const grid = qs("#grid"); grid.innerHTML = "";
     for (const item of (data.items || [])) {
@@ -266,7 +256,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             window.open(url, "_blank");
           } catch (e) {
             console.error(e);
-            alert("ダウンロード用URLの発行に失敗しました");
+            if ($badge) $badge.textContent = "ERROR";
+            alert("マニフェストの読み込みに失敗しました。\nURLや公開状態を確認してください。");
+          }
           }
         };
       }
