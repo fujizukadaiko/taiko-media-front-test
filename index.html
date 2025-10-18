@@ -11,6 +11,7 @@
   /* ===== カラーパレット（水色系） ===== */
   :root{
     --brand:#a2d7dd;   /* 主色（瓶覗） */
+    --border-strong: #9fcbd6;/* 濃いめの枠線色 */
     --brand-d:#84b9cb; /* 濃いめ */
     --bgpage:#ebf6f7;  /* 藍白 */
     --panel:#ffffff;   /* カード背景 */
@@ -23,9 +24,9 @@
 
   /* 使い方（ghost）＝うっすい水色チップ */
   .btn.ghost{
-    background:#f2fbfd;
-    color:#1f2d32;
-    border:1px solid var(--border);
+    border: 1px solid var(--border-strong);     /* ← ここだけ差し替え */
+    background: #f2fbfd;
+    color: #1f2d32;
   }
 
   *{ box-sizing:border-box }
@@ -69,7 +70,7 @@
   .filebox{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
   input[type="file"]{ display:none }
   .filebtn{
-    background:#fff; border:1px solid var(--border);
+    background:#fff; border: 2px solid var(--border-strong);
     color:var(--text); padding:12px 14px; border-radius:14px;
     cursor:pointer; box-shadow:none; font-size:13px;
   }
