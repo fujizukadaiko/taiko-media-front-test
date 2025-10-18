@@ -241,6 +241,7 @@ async function reissueUrl(item, btn){
   }
 }
 function renderHistory(){
+  pruneHistoryExpired();
   const list = loadHistory().slice().reverse();
   const box = $("#result");
   box.innerHTML = "";
@@ -292,6 +293,8 @@ function renderHistory(){
           if (ms <= 0){
             remainSpan.textContent = "期限切れ";
             if (timerId) { clearInterval(timerId); timerId = null; }
+            // 少しだけ待って（UIが「期限切れ」と見えるようにしてから）履歴から除去
+            setTimeout(() => removeHistoryByKey(item.key), 800);
             return;
           }
           remainSpan.textContent = `残り ${fmtRemain(ms)}`;
@@ -331,7 +334,28 @@ function renderHistory(){
     box.appendChild(row);
   }
 }
+  // 起動時に一度描画
+renderHistory();
 
+// 放置中も1分毎に掃除＆再描画
+setInterval(() => { pruneHistoryExpired(); renderHistory(); }, 60 * 1000);
+// 履歴：期限切れ(未キャンセル)を掃除
+function pruneHistoryExpired(){
+  const now = Date.now();
+  const list = loadHistory();
+  // deleteUntil が過去 & まだ cancelled ではない → 除外
+  const kept = list.filter(it => {
+    if (!it.deleteUntil) return true;              // 念のため
+    const expired = new Date(it.deleteUntil).getTime() <= now;
+    return !(expired && !it.cancelled);
+  });
+  if (kept.length !== list.length) saveHistory(kept);
+}
+function removeHistoryByKey(key){
+  const list = loadHistory().filter(x => x.key !== key);
+  saveHistory(list);
+  renderHistory();
+} 
 /** ===== 使い方 ===== */
 $("#howto").addEventListener("click", ()=>{
   alert([
