@@ -275,26 +275,31 @@ function renderHistory(){
       if (item.deleteToken && item.deleteUntil){
         const pill = document.createElement("span");
         pill.className = "pill";
-
+      
         const btnDel = document.createElement("button");
         btnDel.className = "btn small";
         btnDel.style.background = "var(--accent-2)";
         btnDel.style.color = "#0b0c10";
         btnDel.textContent = "取り消す";
-
+      
         const remainSpan = document.createElement("span");
+      
+        // ★ 先に宣言しておく（TDZ回避）
+        let timerId = null;
+      
         const updateRemain = ()=>{
           const ms = new Date(item.deleteUntil).getTime() - Date.now();
           if (ms <= 0){
             remainSpan.textContent = "期限切れ";
-            clearInterval(timer);
+            if (timerId) { clearInterval(timerId); timerId = null; }
             return;
           }
           remainSpan.textContent = `残り ${fmtRemain(ms)}`;
         };
+      
         updateRemain();
-        const timer = setInterval(updateRemain, 1000);
-
+        timerId = setInterval(updateRemain, 1000);
+      
         btnDel.onclick = async ()=>{
           if (!confirm("このファイルを取り消します。よろしいですか？")) return;
           const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
@@ -304,7 +309,7 @@ function renderHistory(){
           });
           const js = await res.json().catch(()=>({}));
           if (res.ok && js.ok){
-            clearInterval(timer);
+            if (timerId) { clearInterval(timerId); timerId = null; }
             item.cancelled = true;
             item.cancelledAt = Date.now();
             item.lastPresignUrl = "";
@@ -315,7 +320,7 @@ function renderHistory(){
             alert("取り消しに失敗しました");
           }
         };
-
+      
         pill.appendChild(btnDel);
         pill.appendChild(remainSpan);
         actions.appendChild(pill);
