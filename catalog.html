@@ -139,21 +139,6 @@ const el = (t,props={}) => Object.assign(document.createElement(t), props);
 const joinPath = (base, path) => base.replace(/\/+$/,"") + path;
 const isVideo = (name='') => /\.(mp4|mov|webm|m4v)$/i.test(name);
 
-/* ===== DOM部品を追加（フォルダ選択と一括DLボタン） ===== */
-(function ensureHeaderControls(){
-  const right = document.querySelector(".right");
-  if (!right) return;
-
-  // フォルダ選択
-  const sel = el("select", { id:"folderSelect", style:"padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text);" });
-  sel.appendChild(el("option", { textContent:"読み込み中…", value:"" }));
-  right.prepend(sel);
-
-  // 原本DL(n)
-  const dlBtn = el("button", { id:"bulkDownload", className:"btn", textContent:"原本DL (0)", disabled:true });
-  right.appendChild(dlBtn);
-})();
-
 /* ===== 状態 ===== */
 let currentManifestUrl = "";
 let currentItems = [];
@@ -165,18 +150,24 @@ async function loadFolderIndex(){
   if (!res.ok) throw new Error("index fetch failed");
   const { folders=[] } = await res.json();
 
-  const sel = $("#folderSelect");
+  const sel = document.getElementById("folderSelect");
+  if (!sel) return;                    // 念のため
   sel.innerHTML = "";
+
   for (const f of folders){
-    const opt = el("option", { value: f.manifest, textContent: f.title ? `${f.date}｜${f.title}` : f.date });
+    const opt = el("option", {
+      value: f.manifest,
+      textContent: f.title ? `${f.date}｜${f.title}` : f.date
+    });
     sel.appendChild(opt);
   }
-  // 直近の日付（先頭）を選択
-  if (folders.length){ sel.value = folders[0].manifest; currentManifestUrl = sel.value; }
-  // 初回描画
+
+  if (folders.length){
+    sel.value = folders[0].manifest;
+    currentManifestUrl = sel.value;
+  }
   if (currentManifestUrl) await renderFolder(currentManifestUrl);
 
-  // 変更時
   sel.onchange = async ()=>{
     selectedKeys.clear();
     updateBulkButton();
