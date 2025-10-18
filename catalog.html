@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>カタログ｜Taiko Media</title>
+<style>
+  :root {
+    --bg:#0b0c10; --panel:#14161a; --text:#e6e7ea; --muted:#9aa3b2;
+    --accent:#7c5cff; --accent-2:#2dd4bf; --border:#22252c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11); color:var(--text); font:16px/1.6 system-ui, -apple-system, "Segoe UI", Arial;}
+  .container{max-width:1100px;margin:24px auto;padding:0 16px}
+  header{display:flex;justify-content:space-between;align-items:center;margin:12px 0 20px}
+  h1{font-size:22px;margin:0}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  input[type="text"]{background:#0f1116;color:var(--text);border:1px solid var(--border);padding:10px 12px;border-radius:10px;min-width:260px}
+  button{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+  button.ghost{background:#1a1c22}
+  button:hover{opacity:.92}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgb(0 0 0 / .3)}
+  .thumb{width:100%;aspect-ratio:4/3;object-fit:cover;background:#0f1116}
+  .meta{padding:10px 12px}
+  .title{font-size:14px;margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badges{display:flex;gap:6px;flex-wrap:wrap}
+  .badge{font-size:11px;color:var(--muted);background:#101319;border:1px solid var(--border);padding:3px 6px;border-radius:999px}
+  .actions{display:flex;gap:8px;margin-top:10px}
+  .actions a,.actions button{flex:1; text-align:center; font-size:13px; padding:9px 10px; border-radius:10px}
+  .dl{background:var(--accent-2); color:#0c1210;}
+  .view{background:#1a1c22; color:#dbe0ea; border:1px solid var(--border)}
+  .muted{opacity:.6; pointer-events:none}
+  footer{color:var(--muted);font-size:12px;margin:24px 0;text-align:center}
+  /* モーダル */
+  dialog{max-width:92vw;width:900px;background:var(--panel);border:1px solid var(--border);border-radius:16px;color:var(--text)}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding:10px 14px}
+  .modal-body{padding:14px}
+  video, .modal-img{width:100%;max-height:70vh;object-fit:contain;background:#0f1116;border-radius:12px}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>イベントカタログ</h1>
+    <div class="controls">
+      <!-- 設定：ここを1回だけ編集 -->
+      <input id="worker" type="text" placeholder="Worker URL" />
+      <input id="manifest" type="text" placeholder="Manifest JSON URL" />
+      <button id="load">読み込む</button>
+    </div>
+  </header>
+
+  <div id="grid" class="grid"></div>
+  <footer>© Taiko Media</footer>
+</div>
+
+<dialog id="viewer">
+  <div class="modal-head">
+    <strong id="v-title"></strong>
+    <button id="v-close" class="ghost">閉じる</button>
+  </div>
+  <div class="modal-body">
+    <div id="v-container"></div>
+  </div>
+</dialog>
+
+<script>
+/* ===== 設定（上部入力に初期値を反映） ===== */
+const DEFAULTS = {
+  WORKER_ORIGIN: "https://あなたの.workers.dev",
+  MANIFEST_URL:  "https://<あなた>.github.io/<repo>/manifest/sample-event.json",
+};
+document.getElementById("worker").value = DEFAULTS.WORKER_ORIGIN;
+document.getElementById("manifest").value = DEFAULTS.MANIFEST_URL;
+
+/* ===== ヘルパ ===== */
+const qs = (s, p=document) => p.querySelector(s);
+const el = (t, c) => Object.assign(document.createElement(t), c);
+const isVideo = (name='') => /\.(mp4|mov|webm)$/i.test(name);
+
+/* ===== メイン ===== */
+qs("#load").onclick = async () => {
+  const WORKER = qs("#worker").value.trim();
+  const MANIFEST = qs("#manifest").value.trim();
+  if (!/^https?:\/\//.test(WORKER) || !/^https?:\/\//.test(MANIFEST)) {
+    return alert("URL を確認してください");
+  }
+  const res = await fetch(MANIFEST);
+  if (!res.ok) return alert("マニフェスト読込に失敗しました");
+  const data = await res.json(); // { eventId, folderNasLink?, items: [{title,key,thumb?,nasLink?}] }
+
+  const grid = qs("#grid"); grid.innerHTML = "";
+  data.items.forEach(item => {
+    const card = el("div", { className:"card" });
+    const img = el("img", { className:"thumb", alt:item.title || "" });
+    img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+    card.appendChild(img);
+
+    const meta = el("div", { className:"meta" });
+    meta.appendChild(el("div", { className:"title", textContent:item.title || item.key.split("/").pop() }));
+
+    const badges = el("div", { className:"badges" });
+    badges.appendChild(el("span", { className:"badge", textContent: isVideo(item.key) ? "video" : "image" }));
+    if (item.nasLink) badges.appendChild(el("span", { className:"badge", textContent: "NAS" }));
+    meta.appendChild(badges);
+
+    const actions = el("div", { className:"actions" });
+
+    // 閲覧（B2 一時URLで高速プレビュー）
+    const btnView = el("button", { className:"view", textContent:"プレビュー" });
+    btnView.onclick = async () => {
+      const pres = await fetch(`${WORKER}/files/presign-get`, {
+        method:"POST",
+        headers: { "content-type":"application/json" },
+        body: JSON.stringify({ key: item.key, expires: 300 })
+      });
+      const { url } = await pres.json();
+      openViewer(item.title || "", url, isVideo(item.key));
+    };
+    actions.appendChild(btnView);
+
+    // 原本DL（NASがあればNAS、なければB2の一時URL）
+    const aDL = el("a", { className:"dl", target:"_blank", textContent:"原本DL" });
+    if (item.nasLink) {
+      aDL.href = item.nasLink;
+    } else {
+      aDL.onclick = async (e) => {
+        e.preventDefault();
+        const pres = await fetch(`${WORKER}/files/presign-get`, {
+          method:"POST",
+          headers: { "content-type":"application/json" },
+          body: JSON.stringify({ key: item.key, expires: 300, attachment: true })
+        });
+        const { url } = await pres.json();
+        window.open(url, "_blank");
+      };
+    }
+    actions.appendChild(aDL);
+
+    meta.appendChild(actions);
+    card.appendChild(meta);
+    grid.appendChild(card);
+  });
+
+  // イベント全体DL（フォルダ共有があれば表示）
+  if (data.folderNasLink) {
+    const bar = el("div", { className:"card", style:"padding:12px;border:1px dashed #2a2e38" });
+    const link = el("a", { className:"dl", href:data.folderNasLink, target:"_blank", textContent:"フォルダごとダウンロード（NAS共有）" });
+    bar.appendChild(link);
+    grid.prepend(bar);
+  }
+};
+
+function openViewer(title, url, video=false){
+  qs("#v-title").textContent = title;
+  const box = qs("#v-container"); box.innerHTML = "";
+  if (video) {
+    const v = el("video", { controls:true, src:url });
+    box.appendChild(v);
+  } else {
+    const img = el("img", { className:"modal-img", src:url, alt:title });
+    box.appendChild(img);
+  }
+  qs("#viewer").showModal();
+}
+qs("#v-close").onclick = () => qs("#viewer").close();
+</script>
+</body>
+</html>
