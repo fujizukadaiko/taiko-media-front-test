@@ -10,17 +10,24 @@
 <style>
   :root{
     /* ── 抹茶テーマ ───────────────────────── */
-    --brand:#a2d7dd;         /* 瓶覗（主カラー） */
-    --brand-d:#84b9cb;       /* 濃いめ（押下/枠線など）浅縹 */
-    --bgpage:#ebf6f7;        /* 藍白 あいじろ（ページ地） */
-    --panel:#ffffff;         /* カード背景は白 */
-    --text:#1e2a1e;          /* 文字色は濃い緑がかった黒 */
-    --muted:#6f7f6a;         /* サブ文字（やや薄） */
-    --border:#c1e4e9;        /* カード枠白藍 */
-    --accent:#c1d8ac;        /* 既存ボタン兼用（brandと揃える） */
-    --accent-2:#86c4a0;      /* プログレス/補助色（柔らかミント） */
-  }
-  
+    :root{
+      --brand:#a2d7dd;      /* 主色（瓶覗） */
+      --brand-d:#84b9cb;    /* 濃いめ */
+      --bgpage:#ebf6f7;     /* 藍白 */
+      --panel:#ffffff;
+      --text:#1e2a1e;
+      --muted:#6e8d92;      /* ← サブ文字を水色系グレーに */
+      --border:#c1e4e9;
+      --accent:#a2d7dd;
+      --accent-2:#86c4a0;
+    }
+    
+    /* 使い方（ghost）を淡い水色のチップ風に */
+    .btn.ghost{
+      background:#f2fbfd;               /* ← うっすい水色 */
+      color:#1f2d32;                    /* 文字色も寒色寄り */
+      border:1px solid var(--border);
+    }
   *{box-sizing:border-box}
   html,body{height:100%}
   
@@ -53,25 +60,36 @@
   .filebox{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   input[type="file"]{display:none}
   .filebtn{
-    background:#fff;border:2px solid var(--brand);color:var(--text);
-    padding:14px;border-radius:14px;cursor:pointer;
-    box-shadow:0 2px 0 0 var(--brand-d) inset;
+    background:#fff;
+    border:1px solid var(--border);   /* ← 枠をカードと同じに */
+    color:var(--text);
+    padding:12px 14px;
+    border-radius:14px;
+    cursor:pointer;
+    box-shadow:none;                  /* ← 影を消す */
+    font-size:13px;      /* 例：14px。もっと小さければ 13px に */
   }
   .filebtn:hover{filter:brightness(1.02)}
   .fileinfo{color:var(--muted);font-size:12px}
   
   /* アップロード開始ボタン＝横長（画面幅に収まる） */
+  /* 共通ボタンはそのまま */
   .btn{
-    background:var(--brand);color:#102010;border:none;
-    padding:12px 16px;border-radius:12px;cursor:pointer;
+    background:var(--brand);
+    color:#102010;
+    border:none;
+    padding:12px 16px;
+    border-radius:12px;
+    cursor:pointer;
   }
+  /* アップロード開始だけの調整 */
   #go{
     width:100%;
-    max-width:680px;           /* 画面幅より少し狭く */
+    max-width:680px;
     display:block;
-    margin:0 auto;
+    margin:10px auto 0;   /* ← 上に余白を追加 */
     font-size:12px;
-    font-weight:600;
+    font-weight:400;      /* ← 太字解除（normal） */
   }
   .btn.ghost{background:#f7fbf3;color:var(--text);border:1px solid var(--border)}
   .btn.small{padding:8px 12px;font-size:13px;border-radius:999px}
@@ -121,6 +139,13 @@
     margin: 0;
   }
   #status{ color: var(--muted); }
+  /* 追加：全体の左右余白（モバイルで効く） */
+  .container{
+    max-width: 860px;
+    margin: 24px auto;
+    padding: 0 14px;         /* ← ここが“カードの左右余白” */
+  }
+  
 </style>
 </head>
 <body>
