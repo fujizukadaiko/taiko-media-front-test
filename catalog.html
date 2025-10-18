@@ -93,7 +93,11 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 .actions button{flex:1;text-align:center;font-size:13px;padding:10px 12px;border-radius:12px;}
 .view{background:var(--chip);color:var(--text);border:1px solid var(--border);}
 
-footer{text-align:center;font-size:11px;color:#94a38f;margin:28px 0;}
+/* フッター（中央・小さく・薄く） */
+  footer{
+    color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
+  }
+  
 </style>
 </head>
 
@@ -113,7 +117,16 @@ footer{text-align:center;font-size:11px;color:#94a38f;margin:28px 0;}
 
   <div id="grid" class="grid"></div>
 
-  <footer>© Taiko Media</footer>
+  <footer id="copyright"></footer>
+  <script>
+    // 初出年を必要に応じて変更
+    const FIRST_YEAR = 1996;
+    const y = new Date().getFullYear();
+    const range = (y === FIRST_YEAR) ? `${y}` : `${FIRST_YEAR}–${y}`;
+    // 実際の権利者名に置き換えてください
+    const holder = "藤塚太鼓";
+    document.getElementById("copyright").textContent = `© ${range} ${holder}`;
+  </script>
 </div>
 <dialog id="viewer">
   <div class="modal-head">
@@ -131,6 +144,7 @@ const CONFIG = {
   WORKER_ORIGIN: "https://taiko-worker-plain.fujizukadaiko.workers.dev",
   INDEX_URL: "https://taiko-worker-plain.fujizukadaiko.workers.dev/catalog/index", // フォルダ索引
   PRESIGN_EXPIRES: 300
+  UPLOAD_URL: "https://fujizukadaiko.github.io/taiko-media-front-test/index.html" // ← 実URLに
 };
 
 /* ===== 便利関数 ===== */
@@ -291,6 +305,17 @@ function openViewer(title, url, video=false){
 }
 document.getElementById("v-close")?.addEventListener("click", ()=> document.getElementById("viewer")?.close());
 
+document.addEventListener("DOMContentLoaded", () => {
+  // 右上ボタンにリンクを付与
+  const a = document.getElementById("toCatalog");
+  if (a && CONFIG.UPLOAD_URL) {
+    a.href = CONFIG.UPLOAD_URL;
+    a.target = "_self"; // 新しいタブで開くなら "_blank"
+  }
+
+  // 既存の初期処理
+  loadFolderIndex();
+});
 /* ===== 起動 ===== */
 document.addEventListener("DOMContentLoaded", loadFolderIndex);
 </script>
