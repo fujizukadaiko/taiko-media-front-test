@@ -155,14 +155,18 @@
   
   /* ピル全体も水色系に寄せる */
   .row-actions .pill{
-    background:#f2fbfd;                /* 淡い水色 */
-    border:1px solid var(--border);
-    color:#1f2d32;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:0;                 /* 内側余白なし */
+    border:0;                  /* 枠なし */
+    background:transparent;    /* 背景なし */
   }
-  /* 履歴の一時URLリンクを寒色に */
-  .hist-name{
-    font-size:14px; line-height:1.4;
-    color:#2b6e77;                    /* 水色寄りのリンク色 */
+  
+  /* カウントダウンの見た目（再発行と同サイズ感） */
+  .row-actions .countdown{
+    font-size:12px;
+    color:#516b70;
   }
   
   /* 「取り消し済み」チップも水色トーンに */
@@ -398,6 +402,7 @@ function renderHistory(){
         btnDel.textContent = "取り消す";
       
         const remainSpan = document.createElement("span");
+        remainSpan.className = "countdown"; 
       
         // ★ 先に宣言しておく（TDZ回避）
         let timerId = null;
