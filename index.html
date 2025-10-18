@@ -9,109 +9,111 @@
 <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
 <style>
   :root{
-    /* ライト基調 + 抹茶グリーンを主役、薄紫は控えめに */
-    --bg:#f8f7fb;
-    --panel:#ffffff;
-    --text:#1f2330;
-    --muted:#6b7280;
-    --border:#e6e7eb;
-  
-    --primary:#79bf5a;      /* 抹茶グリーン（主役） */
-    --primary-d:#63a94a;    /* 押下/ホバー濃色 */
-    --primary-ink:#0b2a0f;  /* 文字色に使うなら */
-  
-    --accent:#b7a8ff;       /* カタログの薄紫（サブ） */
-    --accent-ink:#2b2349;
+    /* ── 抹茶テーマ ───────────────────────── */
+    --brand:#c1d8ac;         /* 裏葉柳（主カラー） */
+    --brand-d:#a9c890;       /* 濃いめ（押下/枠線など） */
+    --bgpage:#d6e9ca;        /* うっすい白緑（ページ地） */
+    --panel:#ffffff;         /* カード背景は白 */
+    --text:#1e2a1e;          /* 文字色は濃い緑がかった黒 */
+    --muted:#6f7f6a;         /* サブ文字（やや薄） */
+    --border:#e6eedc;        /* カード枠の薄い緑 */
+    --accent:#c1d8ac;        /* 既存ボタン兼用（brandと揃える） */
+    --accent-2:#86c4a0;      /* プログレス/補助色（柔らかミント） */
   }
   
   *{box-sizing:border-box}
   html,body{height:100%}
-  html{background:var(--bg)}
+  
+  /* ページの地はうっすい白緑 */
+  html{background:var(--bgpage)}
   body{
     margin:0;
     min-height:100svh;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    background:var(--bg);
+    background:var(--bgpage);
     color:var(--text);
     font:16px/1.6 system-ui, -apple-system, "Segoe UI", Arial;
   }
   
-  /* コンテナ＆カード */
-  .container{max-width:860px;margin:24px auto;padding:0 16px}
+  /* ヘッダ/カードは白ベースに */
+  .topbar{
+    display:flex;gap:12px;align-items:center;justify-content:space-between;
+    background:#fff;
+    border:1px solid var(--border);
+    padding:14px 16px;border-radius:16px;margin:12px 0 20px;
+    box-shadow:0 8px 28px rgba(0,0,0,.04);
+  }
+  .sub{display:none} /* B2説明は非表示 */
+  
   .box{
     background:var(--panel); border:1px solid var(--border);
-    max-width:860px; margin:0 auto; padding:16px; border-radius:16px;
-    box-shadow:0 10px 30px rgba(16, 24, 40, .06);
+    max-width:860px; margin:0 auto; padding:18px; border-radius:16px;
+    box-shadow:0 10px 32px rgba(0,0,0,.06);
   }
   
-  /* ヘッダ（1行で収める） */
-  .topbar{
-    display:flex; align-items:center; justify-content:space-between; gap:12px;
-    background:var(--panel); border:1px solid var(--border);
-    padding:12px 14px; border-radius:14px; margin:12px 0 20px;
-    box-shadow:0 8px 28px rgba(16, 24, 40, .05);
-  }
-  .brand{display:flex; align-items:center; gap:10px; min-width:0}
-  .brand h1{
-    margin:0; font-size:20px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  .right{display:flex; gap:8px; align-items:center; flex:0 0 auto}
-  
-  /* ボタン */
-  .btn{
-    border:none; cursor:pointer; border-radius:10px; padding:10px 14px;
-    background:var(--primary); color:#0b2a0f; font-weight:600;
-  }
-  .btn:hover{ background:var(--primary-d); }
-  .btn:active{ transform:translateY(1px); }
-  .btn.ghost{
-    background:#fff; color:var(--text); border:1px solid var(--border);
-  }
-  .btn.small{ padding:6px 10px; border-radius:999px; }
-  
-  /* ファイル選択 */
-  .filebox{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  /* ファイル選択ボタン（枠＝主カラー） */
+  .filebox{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   input[type="file"]{display:none}
   .filebtn{
-    background:#fff; border:2px solid var(--primary); color:var(--text);
-    padding:12px 14px; border-radius:12px; cursor:pointer;
-    box-shadow:0 1px 2px rgba(16,24,40,.05);
+    background:#fff;border:2px solid var(--brand);color:var(--text);
+    padding:14px;border-radius:14px;cursor:pointer;
+    box-shadow:0 2px 0 0 var(--brand-d) inset;
   }
-  .filebtn:hover{ filter:brightness(1.02); }
-  .fileinfo{ color:var(--muted); font-size:13px }
+  .filebtn:hover{filter:brightness(1.02)}
+  .fileinfo{color:var(--muted);font-size:13px}
   
-  /* プログレス */
+  /* アップロード開始ボタン＝横長（画面幅に収まる） */
+  .btn{
+    background:var(--brand);color:#102010;border:none;
+    padding:14px 16px;border-radius:12px;cursor:pointer;
+  }
+  #go{
+    width:100%;
+    max-width:680px;           /* 画面幅より少し狭く */
+    display:block;
+    margin:0 auto;
+    font-size:16px;
+    font-weight:600;
+  }
+  .btn.ghost{background:#f7fbf3;color:var(--text);border:1px solid var(--border)}
+  .btn.small{padding:8px 12px;font-size:13px;border-radius:999px}
+  .btn:active{transform:translateY(1px)}
+  
+  /* 進捗バー：ボタンにくっつかないように余白 */
   #bar{
-    width:100%; height:12px; background:#f1f5f9;
-    border:1px solid var(--border); border-radius:999px; overflow:hidden
+    width:100%;height:12px;background:#f0f6e8;border:1px solid var(--border);
+    border-radius:999px;overflow:hidden;
+    margin-top:12px;           /* ← 余白を追加 */
   }
-  #bar>div{ height:100%; width:0; background:var(--primary); transition:width .15s linear }
+  #bar>div{height:100%;width:0;background:var(--accent-2);transition:width .15s linear}
   
-  /* 履歴 */
-  #result a{ color:#2563eb; text-decoration:none }
-  #result a:hover{ text-decoration:underline }
-  .item-row{ padding:12px 0; border-bottom:1px dashed var(--border) }
-  .row-actions{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap }
-  .pill{
-    display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
-    border:1px solid var(--border); background:#fff; color:var(--text); font-size:12px
+  /* 履歴表示 */
+  .item-row{padding:12px 0;border-bottom:1px dashed #dfead4}
+  .hist-name{font-size:14px;line-height:1.4;color:#406040}
+  .hist-name:hover{text-decoration:underline}
+  .item-row.cancelled{opacity:.55;filter:grayscale(.15)}
+  .status-cancelled{
+    display:inline-block;margin-left:8px;padding:3px 8px;border-radius:999px;
+    background:#f3f7ef;color:#6f7f6a;border:1px solid var(--border);font-size:12px;
   }
-  
-  .item-row.cancelled{ opacity:.55; filter:grayscale(.1) }
-  .item-row .status-cancelled{
-    display:inline-block; margin-left:8px; padding:4px 8px; border-radius:999px;
-    background:#f3f4f6; color:#6b7280; border:1px solid var(--border); font-size:12px;
+  .row-actions{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .row-actions .pill{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;
+    border:1px solid var(--border);border-radius:999px;background:#f7fbf3;color:var(--text);
   }
-  .item-row .name-cancelled{ text-decoration:line-through; color:#9aa3b2; pointer-events:none; }
-  
-  .hist-name{ font-size:14px; line-height:1.4 }
-  
-  /* モバイル */
   @media (max-width:600px){
-    .btn{ width:auto }              /* 主要ボタンは縮まず保持 */
-    .brand h1{ font-size:18px }
+    .btn{width:100%}
+    .row-actions .btn{width:auto}
+    .row-actions .btn.small{padding:8px 12px}
   }
-  .btn[disabled]{ opacity:.6; cursor:not-allowed }
+  
+  /* フッター：中央・小さく・薄く */
+  footer{
+    color:#94a38f;             /* 薄め */
+    font-size:11px;            /* 小さく */
+    margin:28px 0;
+    text-align:center;         /* 中央揃え */
+  }
   .hist-title { margin:16px 0 6px; font-size:16px }
   .hist-title .note { font-size:12px; color:var(--muted); margin-left:6px }
   
