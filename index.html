@@ -7,6 +7,8 @@
   <!-- iOS/Android の上下バーをダークに揃える -->
   <meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
+  
   <style>
     :root{
       --bg:#0b0c10; --panel:#14161a; --text:#e6e7ea; --muted:#9aa3b2;
@@ -145,7 +147,7 @@
     /***********************
      *  必要な設定（上部固定）
      ***********************/
-    const FRONT_VERSION = "Front v1.0.0"; 
+    const FRONT_VERSION = "Front v1.0.1"; //stable Front v1.0.0
     // ★あなたの Cloudflare Workers 本番URLに置換（例: https://taiko-worker-plain.xxx.workers.dev）
     const DEFAULT_WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
     // 制限など（必要に応じて変更）
@@ -206,10 +208,25 @@
           alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue;
         }
 
-        const month = yyyymm();
-        const rand = Math.random().toString(36).slice(2, 8);
+        // 撮影日時を検出 → 自動フォルダ
+        const { at: takenAt, source } = await detectTakenAt(f);
+        const { ym, ymd } = ymdSegments(takenAt);
+        
+        // 任意サブラベル（もしUIを足すならここで読む。今は空でOK）
+        const subLabel = ""; // 例: "A" や "hall1" を付けたい場合にセット
+        
+        const rand = Math.random().toString(36).slice(2,8);
         const safeName = f.name.replace(/[^\w.\-]/g, "_");
-        const key = `staging/${month}/${eventId}/${Date.now()}_${rand}_${safeName}`;
+        
+        // 同日複数会場も視野なら: staging/YYYYMM/YYYYMMDD[/sub]/<時刻>_<rand>_<元名>
+        const hh = pad2(takenAt.getHours()), mm = pad2(takenAt.getMinutes()), ss = pad2(takenAt.getSeconds());
+        const timeSlug = `${hh}${mm}${ss}`;
+        const baseDir = subLabel ? `staging/${ym}/${ymd}/${subLabel}` : `staging/${ym}/${ymd}`;
+        
+        // 既存の eventId は“タグ”的に末尾へ薄く残しておく運用も可（任意）
+        // const tag = eventId ? `_${eventId}` : "";
+        
+        const key = `${baseDir}/${timeSlug}_${rand}_${safeName}`;
         const contentType = f.type || "application/octet-stream";
 
         // === 代理PUT（CORS回避&安定） ===
@@ -235,7 +252,23 @@
           xhr.onerror = () => reject(new Error("proxy PUT network error"));
           xhr.send(f);
         });
-
+        
+        // 代理PUT
+        const proxyUrl = `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
+        const delInfo = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", proxyUrl, true);
+          xhr.onload = () => {
+            if (xhr.status>=200 && xhr.status<300) {
+              try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({ok:true}); }
+            } else reject(new Error("proxy PUT " + xhr.status));
+          };
+          xhr.onerror = () => reject(new Error("proxy PUT network error"));
+          xhr.send(f);
+        });
+        
+        // delInfo: { ok:true, deleteToken?: "...", deleteUntil?: ISOString }
+        
         // 確認用の一時GETリンク（任意）
         const getRes = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
           method: "POST",
@@ -249,13 +282,68 @@
         a.textContent = `アップロード完了: ${safeName}（一時URL/数分）`;
         a.target = "_blank";
         const li = document.createElement("div");
-        li.appendChild(a);
+
+        // 一時URLリンク
+        if (getUrl) {
+          const a = document.createElement("a");
+          a.href = getUrl; a.target = "_blank";
+          a.textContent = `アップロード完了: ${safeName}（一時URL/数分）`;
+          li.appendChild(a);
+        }
+        
+        // 30分セルフ撤回リンク（あれば）
+        if (delInfo?.deleteToken) {
+          const btn = document.createElement("button");
+          btn.textContent = "取り消す（30分以内）";
+          btn.style.marginLeft = "8px";
+          btn.onclick = async () => {
+            if (!confirm("このファイルを取り消します。よろしいですか？")) return;
+            const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ token: delInfo.deleteToken })
+            });
+            const js = await res.json().catch(()=>({}));
+            if (res.ok && js.ok) {
+              btn.disabled = true; btn.textContent = "取り消しました";
+            } else {
+              alert("取り消しに失敗しました");
+            }
+          };
+          li.appendChild(btn);
+        }
+        
         result.appendChild(li);
       }
 
       status.textContent = "すべて完了！";
       bar.style.width = "100%";
     };
+    // ---------- 撮影日時の検出（画像はEXIF、動画はlastModified） ----------
+    async function detectTakenAt(file) {
+      try {
+        // 画像拡張子ならEXIFを試す
+        if (/\.(jpe?g|heic|heif|webp|tiff?)$/i.test(file.name)) {
+          const exif = await exifr.parse(file, { userComment: false });
+          const d = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
+          if (d instanceof Date && !isNaN(+d)) return { at: d, source: "exif" };
+        }
+      } catch(e) {
+        console.warn("EXIF parse failed:", e);
+      }
+      // 画像で取れなかった／動画など → lastModifiedを使う
+      const d2 = file.lastModified ? new Date(file.lastModified) : new Date();
+      return { at: d2, source: "lastModified" };
+    }
+    
+    // ---------- 文字列ユーティリティ ----------
+    const pad2 = (n)=> String(n).padStart(2,"0");
+    function ymdSegments(d=new Date()){
+      const Y = d.getFullYear();
+      const M = pad2(d.getMonth()+1);
+      const D = pad2(d.getDate());
+      return { y: String(Y), ym: `${Y}${M}`, ymd: `${Y}${M}${D}` };
+    }
   </script>
 </body>
 </html>
