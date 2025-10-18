@@ -1,0 +1,14 @@
+{
+  "folders": [
+    {
+      "date": "20251018",
+      "title": "定期演奏会",
+      "manifest": "https://fujizukadaiko.github.io/taiko-media-front-test/manifest/20251018.json"
+    },
+    {
+      "date": "20251012",
+      "title": "地域祭り",
+      "manifest": "https://fujizukadaiko.github.io/taiko-media-front-test/manifest/20251012.json"
+    }
+  ]
+}
