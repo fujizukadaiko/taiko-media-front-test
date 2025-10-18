@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>アップロード｜Taiko Media</title>
+  <!-- iOS/Android の上下バーをダークに揃える -->
+  <meta name="theme-color" content="#0a0b11" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <style>
     :root{
       --bg:#0b0c10; --panel:#14161a; --text:#e6e7ea; --muted:#9aa3b2;
@@ -69,6 +72,24 @@
     @media (max-width:600px){
       .btn{width:100%}
       .brand h1{font-size:18px}
+    }
+    /* ページ外周（角丸の外）もダークで塗る */
+    html { background:#0a0b11; }
+    
+    /* アドレスバー伸縮でも常に全高を確保（iOS向け） */
+    body { min-height: 100svh; }        /* 17+ */
+    @supports not (height: 1svh) {
+      body { min-height: 100vh; }       /* フォールバック */
+    }
+    
+    /* 安全領域の内側に余白を入れつつ、背景は下まで続く（既に入っているならそのままでOK） */
+    /* body には既に padding: env(safe-area-*) を入れてありますが、
+       念のため “背景が切れない” ように固定の裏地を敷いておきます。 */
+    body::before{
+      content:"";
+      position:fixed; inset:0; z-index:-1;
+      /* ページの背景と同じ塗り */
+      background:linear-gradient(180deg,#0a0b11,#0d0f15 60%,#0a0b11);
     }
   </style>
 </head>
