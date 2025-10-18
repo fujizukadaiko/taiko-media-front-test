@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Upload to B2 via Workers</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Arial; margin: 24px; }
+    .box { max-width: 680px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+    .row { margin: 12px 0; }
+    #bar { width: 100%; height: 10px; background: #eee; border-radius: 6px; overflow: hidden; }
+    #bar > div { height: 100%; width: 0%; background: #4caf50; transition: width .1s linear; }
+    code { background: #f5f5f5; padding: 2px 6px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>アップロード</h1>
+    <div class="row">
+      <input id="file" type="file" multiple />
+    </div>
+    <div class="row">
+      <label>イベントID：</label>
+      <input id="eventId" placeholder="20251012-concertA" />
+    </div>
+    <div class="row">
+      <button id="go">アップロード開始</button>
+    </div>
+    <div class="row">
+      <div id="bar"><div></div></div>
+      <div id="status"></div>
+      <div id="result"></div>
+    </div>
+    <hr />
+    <p>Worker: <code id="workerOrigin"></code></p>
+  </div>
+
+  <script>
+    // ★ あなたの Workers 本番URLに置き換え
+    const WORKER_ORIGIN = "https://taiko-worker-plain.＜あなた＞.workers.dev";
+
+    document.getElementById("workerOrigin").textContent = WORKER_ORIGIN;
+
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const yyyymm = (d=new Date()) => d.getFullYear() + pad2(d.getMonth()+1);
+
+    document.getElementById("go").onclick = async () => {
+      const files = document.getElementById("file").files;
+      const eventId = document.getElementById("eventId").value.trim() || "event-" + yyyymm();
+      if (!files.length) return alert("ファイルを選んでください。");
+
+      const bar = document.querySelector("#bar > div");
+      const status = document.getElementById("status");
+      const result = document.getElementById("result");
+      result.innerHTML = ""; status.textContent = ""; bar.style.width = "0%";
+
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const month = yyyymm();
+        const rand = Math.random().toString(36).slice(2, 8);
+        const safeName = f.name.replace(/[^\w.\-]/g, "_");
+        const key = `staging/${month}/${eventId}/${Date.now()}_${rand}_${safeName}`;
+
+        // 1) 署名URLを取得
+        const presignRes = await fetch(WORKER_ORIGIN + "/uploads/presign", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          // ブラウザは自動的に Origin を送る → Workers 側の ALLOWED_ORIGIN と一致している必要あり
+          body: JSON.stringify({ key, contentType: f.type || "application/octet-stream", expires: 600 }),
+        });
+        if (!presignRes.ok) {
+          const e = await presignRes.text();
+          alert("presign失敗: " + e);
+          return;
+        }
+        const { url } = await presignRes.json();
+
+        // 2) 進捗を取りたいので XMLHttpRequest で PUT
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", url, true);
+          if (f.type) xhr.setRequestHeader("Content-Type", f.type);
+          xhr.upload.onprogress = (ev) => {
+            if (ev.lengthComputable) {
+              const p = Math.round((ev.loaded / ev.total) * 100);
+              bar.style.width = p + "%";
+              status.textContent = `アップロード中 ${i+1}/${files.length} ... ${p}%`;
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error("PUT失敗 status=" + xhr.status));
+            }
+          };
+          xhr.onerror = () => reject(new Error("PUTエラー"));
+          xhr.send(f);
+        });
+
+        // 3) 結果表示（B2到着確認リンク: 署名GETを発行）
+        const getRes = await fetch(WORKER_ORIGIN + "/files/presign-get", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ key, expires: 300 }),
+        });
+        const { url: getUrl } = await getRes.json();
+
+        const a = document.createElement("a");
+        a.href = getUrl;
+        a.textContent = `アップロード完了: ${safeName}（一時URL/5分）`;
+        a.target = "_blank";
+        const li = document.createElement("div");
+        li.appendChild(a);
+        result.appendChild(li);
+      }
+
+      status.textContent = "すべて完了！";
+      bar.style.width = "100%";
+    };
+  </script>
+</body>
+</html>
