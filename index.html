@@ -273,44 +273,18 @@
 
 <script>
 /** ===== 設定（ここだけ変更） ===== */
-const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
+const WORKER_ORIGIN = "サンプル";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
 const SELF_DELETE_TTL_SEC = 30*60; // 30分（参考表示用）
 const LS_KEY = "tm/uploads/v1";    // ローカル履歴のキー
-const CANCELLED_KEEP_MS = 6 * 60 * 60 * 1000;// 取り消し済みの履歴をどれくらい残すか（ミリ秒）
-// 例: 24時間 = 24 * 60 * 60 * 1000
-// ===== ルーティング・しきい値 =====
-const THRESHOLD_MB = 300; // 300MB超なら外部ブラウザ誘導
-const CATALOG_URL = "https://example.com/catalog";        // ← 実際のカタログURLに
-const STANDALONE_URL = location.href;                     // ← このページの外部ブラウザ版
-const catalogBtn = document.getElementById("toCatalog");
-// ===== 導線（nullガード付き） =====
-function wireNav() {
-  const catalogBtn = document.getElementById("toCatalog");
-  if (catalogBtn) {
-    catalogBtn.addEventListener("click", () => {
-      location.href = CATALOG_URL;
-    });
-  }
+const CANCELLED_KEEP_MS = 6 * 60 * 60 * 1000; // 取り消し済を残す期間
+const THRESHOLD_MB = 300;          // 300MB超→外部ブラウザ誘導
+const CATALOG_URL = "https://example.com/catalog";   // ←実URLに
+const STANDALONE_URL = location.href;                // ←このページ
 
-  const openLink = document.getElementById("openInBrowser");
-  if (openLink) {
-    openLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      window.open(STANDALONE_URL, "_blank");
-    });
-  }
-}
-
-// 要素がまだ無いタイミングでも安全に
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", wireNav);
-} else {
-  wireNav();
-}
 /** ===== 便利関数 ===== */
-const $  = (s,p=document)=>p.querySelector(s);
+const $ = (s,p=document)=>p.querySelector(s);
 const pad2 = (n)=> String(n).padStart(2,"0");
 function ymdSegments(d=new Date()){
   const Y=d.getFullYear(), M=pad2(d.getMonth()+1), D=pad2(d.getDate());
@@ -323,75 +297,65 @@ async function detectTakenAt(file){
       const d = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
       if (d instanceof Date && !isNaN(+d)) return { at:d, source:"exif" };
     }
-  }catch(e){ console.warn("EXIF parse failed:", e); }
+  }catch{}
   return { at: file.lastModified ? new Date(file.lastModified) : new Date(), source:"lastModified" };
 }
 
-/** ===== 履歴の保存・描画 ===== */
+/** ===== 履歴（保存・描画・掃除） ===== */
 function loadHistory(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch{ return []; } }
 function saveHistory(list){ localStorage.setItem(LS_KEY, JSON.stringify(list.slice(-200))); }
 function addHistory(entry){ const list = loadHistory(); list.push(entry); saveHistory(list); renderHistory(); }
-function fmtRemain(ms){
-  if (ms<=0) return "期限切れ";
-  const m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000);
-  return `${m}分${pad2(s)}秒`;
-}
+function removeHistoryByKey(key){ saveHistory(loadHistory().filter(x=>x.key!==key)); renderHistory(); }
+function fmtRemain(ms){ if(ms<=0) return "期限切れ"; const m=Math.floor(ms/60000), s=Math.floor((ms%60000)/1000); return `${m}分${pad2(s)}秒`; }
+
 async function reissueUrl(item, btn){
-  // 視覚フィードバック & 連打防止
-  if (btn) {
-    btn.disabled = true;
-    btn.setAttribute('aria-busy', 'true');
-    btn._prevText = btn.textContent;
-    btn.textContent = '発行中…';
-  }
-
-  try {
-    const res = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
-      method: "POST",
-      headers: { "content-type":"application/json" },
-      body: JSON.stringify({ key: item.key, expires: PRESIGN_EXPIRES })
+  if (btn) { btn.disabled=true; btn.setAttribute('aria-busy','true'); btn._prevText=btn.textContent; btn.textContent='発行中…'; }
+  try{
+    const res = await fetch(`${WORKER_ORIGIN}/files/presign-get`,{
+      method:"POST", headers:{ "content-type":"application/json" },
+      body: JSON.stringify({ key:item.key, expires:PRESIGN_EXPIRES })
     });
-    if (!res.ok) throw new Error(`presign-get ${res.status}`);
+    if(!res.ok) throw new Error(`presign-get ${res.status}`);
     const { url } = await res.json();
-
-    // localStorage 更新
     item.lastPresignUrl = url || "";
     item.lastPresignAt  = Date.now();
-    const list = loadHistory();
-    const idx  = list.findIndex(x => x.key === item.key);
-    if (idx >= 0) { list[idx] = item; saveHistory(list); }
-
-    // ★ ここでは再描画しない（ボタン表示を維持）
-    // ★ 成功時にURLを返す
-    const updatedUrl = item.lastPresignUrl || "";
-    
+    const list = loadHistory(); const idx = list.findIndex(x=>x.key===item.key);
+    if(idx>=0){ list[idx]=item; saveHistory(list); }
     if (btn) {
-      btn.textContent = '発行済み ✓';
-      btn.setAttribute('aria-busy', 'false');
-      setTimeout(() => {
-        btn.textContent = btn._prevText || '再発行';
-        btn.disabled = false;
-        renderHistory();
-      }, 1200);
-    } else {
-      renderHistory();
-    }
-    return updatedUrl;   // ← これを追加
-  } catch (e) {
+      btn.textContent='発行済み ✓'; btn.setAttribute('aria-busy','false');
+      setTimeout(()=>{ btn.textContent=btn._prevText||'再発行'; btn.disabled=false; renderHistory(); },1200);
+    } else { renderHistory(); }
+    return item.lastPresignUrl || "";
+  }catch(e){
     console.error(e);
-    if (btn) {
-      btn.textContent = '失敗…再試行';
-      btn.disabled = false;
-      btn.setAttribute('aria-busy', 'false');
-    }
+    if (btn) { btn.textContent='失敗…再試行'; btn.disabled=false; btn.setAttribute('aria-busy','false'); }
     return null;
   }
 }
+
+function pruneHistoryExpired(){
+  const now = Date.now();
+  const list = loadHistory();
+  const kept = list.filter(it=>{
+    if (it.deleteUntil && !it.cancelled) {
+      const expired = new Date(it.deleteUntil).getTime() <= now;
+      if (expired) return false;
+    }
+    if (it.cancelled && it.cancelledAt) {
+      if (now - it.cancelledAt >= CANCELLED_KEEP_MS) return false;
+    }
+    return true;
+  });
+  if (kept.length !== list.length) saveHistory(kept);
+}
+
 function renderHistory(){
   pruneHistoryExpired();
   const list = loadHistory().slice().reverse();
   const box = $("#result");
+  if (!box) return;
   box.innerHTML = "";
+
   for (const item of list){
     const row = document.createElement("div");
     row.className = "item-row" + (item.cancelled ? " cancelled" : "");
@@ -399,38 +363,22 @@ function renderHistory(){
     const link = document.createElement("a");
     link.className = "hist-name";
     link.textContent = `アップロード完了：${item.name}`;
-    
-    const isExpired = () => {
+
+    const isExpired = ()=>{
       if (!item.lastPresignUrl || !item.lastPresignAt) return true;
-      const age = Date.now() - item.lastPresignAt;
-      // ちょい余裕（2秒）を引く
-      return age >= (PRESIGN_EXPIRES * 1000 - 2000);
+      return (Date.now() - item.lastPresignAt) >= (PRESIGN_EXPIRES*1000 - 2000);
     };
-    
-    if (item.cancelled || !item.lastPresignUrl){
-      link.href = "#";
-      link.classList.add("name-cancelled");
-    } else {
-      link.href = item.lastPresignUrl;
-      link.target = "_blank";
-    }
-    
-     // 期限切れなら再発行を促す
-    link.onclick = async (e) => {
+
+    if (item.cancelled || !item.lastPresignUrl){ link.href="#"; link.classList.add("name-cancelled"); }
+    else { link.href=item.lastPresignUrl; link.target="_blank"; }
+
+    link.onclick = async (e)=>{
       if (item.cancelled) { e.preventDefault(); return; }
-      if (!item.lastPresignUrl || isExpired()) {
+      if (!item.lastPresignUrl || isExpired()){
         e.preventDefault();
-        const go = confirm("この一時URLは有効期限が切れています。新しいURLを再発行しますか？");
-        if (!go) return;
-    
+        if (!confirm("この一時URLは有効期限が切れています。新しいURLを再発行しますか？")) return;
         const newUrl = await reissueUrl(item, null);
-        if (newUrl) {
-          // その場のリンクも更新しておく
-          link.href = newUrl;
-          link.target = "_blank";
-          link.classList.remove("name-cancelled");
-          window.open(newUrl, "_blank");
-        }
+        if (newUrl){ link.href=newUrl; link.target="_blank"; link.classList.remove("name-cancelled"); window.open(newUrl,"_blank"); }
       }
     };
     row.appendChild(link);
@@ -453,210 +401,138 @@ function renderHistory(){
       actions.appendChild(btnRe);
 
       if (item.deleteToken && item.deleteUntil){
-        const pill = document.createElement("span");
-        pill.className = "pill";
-      
-        const btnDel = document.createElement("button");
-        btnDel.className = "btn small cancel";
-        btnDel.textContent = "取り消す";
-      
-        const remainSpan = document.createElement("span");
-        remainSpan.className = "countdown"; 
-      
-        // ★ 先に宣言しておく（TDZ回避）
+        const pill = document.createElement("span"); pill.className = "pill";
+        const btnDel = document.createElement("button"); btnDel.className = "btn small cancel"; btnDel.textContent = "取り消す";
+        const remainSpan = document.createElement("span"); remainSpan.className = "countdown";
         let timerId = null;
-      
         const updateRemain = ()=>{
           const ms = new Date(item.deleteUntil).getTime() - Date.now();
           if (ms <= 0){
             remainSpan.textContent = "期限切れ";
-            if (timerId) { clearInterval(timerId); timerId = null; }
-            // 少しだけ待って（UIが「期限切れ」と見えるようにしてから）履歴から除去
-            setTimeout(() => removeHistoryByKey(item.key), 800);
+            if (timerId) clearInterval(timerId);
+            setTimeout(()=> removeHistoryByKey(item.key), 800);
             return;
           }
           remainSpan.textContent = `残り ${fmtRemain(ms)}`;
         };
-      
-        updateRemain();
-        timerId = setInterval(updateRemain, 1000);
-      
+        updateRemain(); timerId = setInterval(updateRemain, 1000);
+
         btnDel.onclick = async ()=>{
           if (!confirm("このファイルを取り消します。よろしいですか？")) return;
           const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
-            method:"POST",
-            headers:{ "content-type":"application/json" },
+            method:"POST", headers:{ "content-type":"application/json" },
             body: JSON.stringify({ token:item.deleteToken })
           });
           const js = await res.json().catch(()=>({}));
           if (res.ok && js.ok){
-            if (timerId) { clearInterval(timerId); timerId = null; }
-            item.cancelled = true;
-            item.cancelledAt = Date.now();
-            item.lastPresignUrl = "";
-            const all = loadHistory().map(x => x.key===item.key ? item : x);
-            saveHistory(all);
-            renderHistory();
-          }else{
-            alert("取り消しに失敗しました");
-          }
+            if (timerId) clearInterval(timerId);
+            item.cancelled = true; item.cancelledAt = Date.now(); item.lastPresignUrl = "";
+            const all = loadHistory().map(x=> x.key===item.key ? item : x); saveHistory(all); renderHistory();
+          }else{ alert("取り消しに失敗しました"); }
         };
-      
+
         pill.appendChild(btnDel);
         pill.appendChild(remainSpan);
         actions.appendChild(pill);
       }
     }
-
     row.appendChild(actions);
     box.appendChild(row);
   }
 }
-  // 起動時に一度描画
-renderHistory();
-
-// 放置中も1分毎に掃除＆再描画
-setInterval(() => { pruneHistoryExpired(); renderHistory(); }, 60 * 1000);
-// 履歴：期限切れ(未キャンセル)を掃除
-function pruneHistoryExpired(){
-  const now = Date.now();
-  const list = loadHistory();
-
-  const kept = list.filter(it => {
-    // ① 取り消しトークンの期限切れ（未キャンセルの場合は除外する＝消す）
-    if (it.deleteUntil && !it.cancelled) {
-      const expired = new Date(it.deleteUntil).getTime() <= now;
-      if (expired) return false; // 履歴から消す
-    }
-
-    // ② 取り消し済みで、一定時間を超えたら除外する
-    if (it.cancelled && it.cancelledAt) {
-      const age = now - it.cancelledAt;
-      if (age >= CANCELLED_KEEP_MS) return false; // 履歴から消す
-    }
-
-    return true; // 残す
-  });
-
-  if (kept.length !== list.length) saveHistory(kept);
-}
-function removeHistoryByKey(key){
-  const kept = loadHistory().filter(x => x.key !== key);
-  saveHistory(kept);
-  renderHistory();
-}
-/** ===== 使い方 ===== */
-$("#howto").addEventListener("click", ()=>{
-  alert([
-    "① 画像/動画を選択（複数可）",
-    "② 「アップロード開始」",
-    "③ 一覧に結果が残ります（再読み込みしてもOK）",
-    "・一時URLは5分。必要なら「再発行」を押してください",
-    "・誤アップは30分以内なら「取り消す」で自己撤回できます"
-  ].join("\n"));
-});
 
 /** ===== ファイル選択表示 ===== */
-$("#file").addEventListener("change", () => {
+$("#file")?.addEventListener("change", ()=>{
   const f = $("#file").files;
-  if (!f || !f.length) return $("#fileinfo").textContent = "未選択";
+  if (!f || !f.length) { $("#fileinfo").textContent = "未選択"; return; }
   let total = 0; for (const x of f) total += x.size||0;
   $("#fileinfo").textContent = `${f.length} 件・合計 ${(total/1024/1024).toFixed(1)} MB`;
 });
 
+/** ===== ナビ導線（存在すれば） ===== */
+document.getElementById("toCatalog")?.addEventListener("click", ()=>{ location.href = CATALOG_URL; });
+document.getElementById("openInBrowser")?.addEventListener("click", (e)=>{ e.preventDefault(); window.open(STANDALONE_URL, "_blank"); });
+
 /** ===== メイン：アップロード ===== */
-document.getElementById("go").onclick = async () => {
+document.getElementById("go")?.addEventListener("click", async ()=>{
   if (!/^https?:\/\//.test(WORKER_ORIGIN)) { alert("Worker URL が不正です"); return; }
 
-  const fileEl   = document.getElementById("file");
-  const files    = fileEl.files;
+  const fileEl = document.getElementById("file");
+  const files  = fileEl.files;
   if (!files.length) return alert("ファイルを選んでください。");
 
-  // ① 合計サイズで外部ブラウザ誘導
+  // 合計サイズで外部ブラウザ誘導
   const totalMB = [...files].reduce((s,f)=> s + (f.size||0), 0) / 1024 / 1024;
   if (totalMB > THRESHOLD_MB) {
-    const go = confirm(`選択されたファイル合計は約 ${totalMB.toFixed(1)} MB です。\n` +
-                       `大容量はLIFF内だと不安定な場合があります。外部ブラウザで開きますか？`);
+    const go = confirm(`選択されたファイル合計は約 ${totalMB.toFixed(1)} MB です。\n大容量はLIFF内だと不安定な場合があります。外部ブラウザで開きますか？`);
     if (go) { window.open(STANDALONE_URL, "_blank"); return; }
   }
 
   const barFill  = document.querySelector("#bar > div");
   const statusEl = document.getElementById("status");
-  const noteEl   = document.getElementById("note");
+  const noteEl   = document.getElementById("note"); // 無ければ何もしない
   const fileInfo = document.getElementById("fileinfo");
   const goBtn    = document.getElementById("go");
 
   // UI初期化
   statusEl.textContent = "";
-  statusEl.style.fontSize = "12px";        // ② 文字小さめ
-  statusEl.style.color = "#3b4b50";        // ② やや濃いめ
-  noteEl.textContent = "";                 // 注意書き初期化
-  barFill.style.width  = "0%";
-  goBtn.disabled = true;
-  goBtn.textContent = "アップロード中…";
+  statusEl.style.fontSize = "12px";
+  statusEl.style.color = "#3b4b50";
+  if (noteEl) noteEl.textContent = "";
+  barFill.style.width = "0%";
+  goBtn.disabled = true; goBtn.textContent = "アップロード中…";
 
   const total = files.length;
-  let done = 0;
-  let successCount = 0;
+  let done = 0, successCount = 0;
 
   for (let i = 0; i < total; i++) {
     const f = files[i];
-
-    try {
-      if (f.size > MAX_FILE_MB * 1024 * 1024) {
-        alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`);
-        continue;
-      }
+    try{
+      if (f.size > MAX_FILE_MB * 1024 * 1024) { alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
 
       statusEl.textContent = `アップロード中 ${i+1}/${total} … 0%`;
-      noteEl.textContent   = "アップロード中は画面を開いたままにしてください（LIFFでは画面ロックで停止します）"; // ③ 注意書き
+      if (noteEl) noteEl.textContent = "アップロード中は画面を開いたままにしてください（LIFFでは画面ロックで停止します）";
 
-      // 撮影日時から key を構成
-      const { at: takenAt } = await detectTakenAt(f);
+      const { at:takenAt } = await detectTakenAt(f);
       const { ym, ymd } = ymdSegments(takenAt);
-      const rand     = Math.random().toString(36).slice(2,8);
+      const rand = Math.random().toString(36).slice(2,8);
       const safeName = f.name.replace(/[^\w.\-]/g, "_");
-      const hh = pad2(takenAt.getHours()), mm = pad2(takenAt.getMinutes()), ss = pad2(takenAt.getSeconds());
-      const timeSlug = `${hh}${mm}${ss}`;
+      const timeSlug = `${pad2(takenAt.getHours())}${pad2(takenAt.getMinutes())}${pad2(takenAt.getSeconds())}`;
       const key = `staging/${ym}/${ymd}/${timeSlug}_${rand}_${safeName}`;
       const contentType = f.type || "application/octet-stream";
 
       // 代理PUT
       const proxyUrl = `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
-      const delInfo = await new Promise((resolve, reject) => {
+      const delInfo = await new Promise((resolve, reject)=>{
         const xhr = new XMLHttpRequest();
         xhr.open("POST", proxyUrl, true);
-        xhr.timeout = 30 * 60 * 1000; // ② 30分に延長
-        xhr.upload.onprogress = (ev) => {
+        xhr.timeout = 30*60*1000; // 30分
+        xhr.upload.onprogress = (ev)=>{
           if (ev.lengthComputable) {
-            const p = Math.round((ev.loaded / ev.total) * 100);
+            const p = Math.round((ev.loaded/ev.total)*100);
             barFill.style.width = p + "%";
             statusEl.textContent = `アップロード中 ${i+1}/${total} … ${p}%`;
           }
         };
-        xhr.onload    = () => { (xhr.status>=200 && xhr.status<300)
-                                ? resolve(JSON.parse(xhr.responseText || "{}"))
-                                : reject(new Error("proxy PUT " + xhr.status)); };
-        xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
-        xhr.onerror   = () => reject(new Error("proxy PUT network error"));
+        xhr.onload    = ()=> (xhr.status>=200 && xhr.status<300) ? resolve(JSON.parse(xhr.responseText||"{}")) : reject(new Error("proxy PUT " + xhr.status));
+        xhr.ontimeout = ()=> reject(new Error("proxy PUT timeout"));
+        xhr.onerror   = ()=> reject(new Error("proxy PUT network error"));
         xhr.send(f);
       });
 
       // 一時URL 5分
       let presigned = "";
-      try {
-        const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`, {
-          method: "POST",
-          headers: { "content-type":"application/json" },
-          body: JSON.stringify({ key, expires: PRESIGN_EXPIRES })
+      try{
+        const pres = await fetch(`${WORKER_ORIGIN}/files/presign-get`,{
+          method:"POST", headers:{ "content-type":"application/json" },
+          body: JSON.stringify({ key, expires:PRESIGN_EXPIRES })
         });
-        const { url } = await pres.json();
-        presigned = url || "";
-      } catch {}
+        const { url } = await pres.json(); presigned = url || "";
+      }catch{}
 
       // 履歴へ
       addHistory({
-        key, name: safeName,
+        key, name:safeName,
         deleteToken: delInfo?.deleteToken || null,
         deleteUntil: delInfo?.deleteUntil || null,
         createdAt: Date.now(),
@@ -665,42 +541,28 @@ document.getElementById("go").onclick = async () => {
       });
 
       successCount++;
-    } catch (e) {
+    }catch(e){
       console.error("upload failed:", e);
-    } finally {
-      done++;
-      statusEl.textContent = `完了 ${done}/${total}`;
+    }finally{
+      done++; statusEl.textContent = `完了 ${done}/${total}`;
     }
   }
 
-  // 終了時の文言と注意書きクリア
-  if (successCount > 0) {
-    statusEl.textContent = "すべて完了！";
-  } else {
-    statusEl.textContent = "エラーが発生しました";
-    alert("アップロードに失敗しました");
-  }
-  noteEl.textContent = "";  // ③ 注意書き消す
+  statusEl.textContent = successCount > 0 ? "すべて完了！" : "エラーが発生しました";
+  if (successCount === 0) alert("アップロードに失敗しました");
+  if (noteEl) noteEl.textContent = "";
 
   // リセット
   barFill.style.width = "0%";
   try { fileEl.value = ""; } catch {}
   if (fileInfo) fileInfo.textContent = "未選択";
-  goBtn.disabled = false;
-  goBtn.textContent = "アップロード開始";
-};
-document.getElementById("toCatalog").addEventListener("click", () => {
-  location.href = CATALOG_URL;               // 同一タブ遷移でOK（必要なら window.open）
+  goBtn.disabled = false; goBtn.textContent = "アップロード開始";
 });
 
-document.getElementById("openInBrowser").addEventListener("click", (e) => {
-  e.preventDefault();
-  // LIFF内でも外部ブラウザを開かせる
-  window.open(STANDALONE_URL, "_blank");
-});
-
-/** 初期描画（保存済み履歴を表示） */
+/** ===== 初期描画 ===== */
 renderHistory();
+// 放置中も1分毎に掃除＆再描画
+setInterval(()=>{ pruneHistoryExpired(); renderHistory(); }, 60*1000);
 </script>
 </body>
 </html>
