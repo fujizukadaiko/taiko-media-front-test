@@ -89,6 +89,37 @@
     background:#2a2e38; color:#cfd4e1; border:1px solid #3a404c; font-size:12px;
   }
   .item-row .name-cancelled{ text-decoration:line-through; color:#9aa3b2; pointer-events:none; }
+  /* 履歴：タイトルリンクを少し小さく */
+  .hist-name{
+    font-size: 15px;          /* お好みで 14〜15px */
+    line-height: 1.4;
+  }
+  
+  /* 履歴：アクション行を横並びに */
+  .row-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:8px;
+    flex-wrap:wrap;           /* 幅が足りなければ折り返し */
+  }
+  
+  /* 取り消しピル（ボタン＋残り時間）を横並びに */
+  .row-actions .pill{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:999px;
+    background:#101319;
+  }
+  
+  /* モバイル時、上の「全幅ボタン」ルールが干渉しないよう上書き */
+  @media (max-width:600px){
+    .row-actions .btn{ width:auto; }  /* 行内は幅自動 */
+    .row-actions .btn.small{ padding:8px 12px; }
+  }
 </style>
 </head>
 <body>
@@ -202,9 +233,10 @@ function renderHistory(){
 
     // タイトル/リンク
     const link = document.createElement("a");
+    link.className = "hist-name";                       // ★ 追加：小さめ表示用
     link.textContent = `アップロード完了：${item.name}（一時URL/数分）`;
     if (item.cancelled || !item.lastPresignUrl){
-      link.href = "#"; link.className = "name-cancelled";
+      link.href = "#"; link.className += " name-cancelled";
     }else{
       link.href = item.lastPresignUrl; link.target = "_blank";
     }
@@ -219,22 +251,29 @@ function renderHistory(){
 
     const actions = document.createElement("div");
     actions.className = "row-actions";
-
+    
     // 再発行（取り消し済は非表示）
     if (!item.cancelled){
       const btnRe = document.createElement("button");
       btnRe.className = "btn small ghost";
       btnRe.textContent = "再発行";
       btnRe.onclick = ()=> reissueUrl(item, row);
-      actions.appendChild(btnRe);
+      actions.appendChild(btnRe);                        // ★ 先に追加（左）
     }
 
     // 取り消し（取り消し済は非表示）
     if (!item.cancelled && item.deleteToken && item.deleteUntil){
-      const pill = document.createElement("span"); pill.className = "pill";
+      const pill = document.createElement("span");
+      pill.className = "pill";
+    
+      const btnDel = document.createElement("button");
+      btnDel.className = "btn small";
+      btnDel.style.background = "var(--accent-2)";
+      btnDel.style.color = "#0b0c10";
+      btnDel.textContent = "取り消す";
+    
       const remainSpan = document.createElement("span");
-
-      // カウントダウン
+    
       const updateRemain = ()=>{
         const ms = new Date(item.deleteUntil).getTime() - Date.now();
         if (ms <= 0){
@@ -247,12 +286,7 @@ function renderHistory(){
       };
       updateRemain();
       const timer = setInterval(updateRemain, 1000);
-
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn small";
-      btnDel.style.background = "var(--accent-2)";
-      btnDel.style.color = "#0b0c10";
-      btnDel.textContent = "取り消す";
+    
       btnDel.onclick = async ()=>{
         if (!confirm("このファイルを取り消します。よろしいですか？")) return;
         const res = await fetch(`${WORKER_ORIGIN}/files/self-delete`,{
@@ -263,26 +297,22 @@ function renderHistory(){
         const js = await res.json().catch(()=>({}));
         if (res.ok && js.ok){
           clearInterval(timer);
-
-          // 状態更新＆保存
           item.cancelled = true;
           item.cancelledAt = Date.now();
           item.lastPresignUrl = "";
           const all = loadHistory().map(x => x.key===item.key ? item : x);
           saveHistory(all);
-
-          // 即時反映
-          renderHistory();
+          renderHistory();                                // 即時反映（打ち消し線＆バッジ）
         }else{
           alert("取り消しに失敗しました");
         }
       };
-
+    
       pill.appendChild(btnDel);
       pill.appendChild(remainSpan);
-      actions.appendChild(pill);
+      actions.appendChild(pill);                           // ★ 再発行の右側に並ぶ
     }
-
+    
     row.appendChild(actions);
     box.appendChild(row);
   }
