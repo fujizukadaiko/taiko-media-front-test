@@ -262,6 +262,30 @@ async function renderFolder(manifestUrl){
     meta.appendChild(actions);
     grid.appendChild(card);
   }
+      const badges = el("div", { className:"badges" });
+
+      // ① 種別バッジ（動画 or 画像）
+      const kind = isVideo(item.key) ? "video" : "image";
+      const kindBadge = el("span", { className:"badge", textContent: kind });
+      if (kind === "video"){
+        kindBadge.style.color="#2d5560";
+        kindBadge.style.background="#eef8fb";
+      } else {
+        kindBadge.style.color="#47644a";
+        kindBadge.style.background="#f2f7f1";
+      }
+      badges.appendChild(kindBadge);
+  
+      // ② タグバッジ（D1 から返ってきた item.tags を表示）
+      if (Array.isArray(item.tags)) {
+        for (const tagName of item.tags) {
+          const tagBadge = el("span", {
+            className: "badge",
+            textContent: tagName
+          });
+          badges.appendChild(tagBadge);
+        }
+      }
 }
 
 /* ===== 原本DL(複数) ===== */
