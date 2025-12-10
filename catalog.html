@@ -444,23 +444,27 @@ function applyTagFilterFromInput(){
   
 // ===== タグ編集（超シンプル版：prompt で編集） =====
 async function openTagEditor(item){
-  // 現在のタグ配列 → "発表 子どもの部 かるがもマラソン" みたいな文字列へ
   const currentText = Array.isArray(item.tags) ? item.tags.join(" ") : "";
 
   const input = prompt(
     "タグをスペース区切りで入力してください（例: 発表 子どもの部 かるがもマラソン）",
     currentText
   );
-  // キャンセルされたとき
   if (input === null) return;
 
-  // 入力文字列 → 配列
   const tags = input
     .split(/\s+/)
     .map(t => t.trim())
     .filter(t => t.length > 0);
 
-  try{
+  // ★ ここ：元々タグあったのに、今回ゼロになっている＝実質「全部削除」
+  const hadBefore = Array.isArray(item.tags) && item.tags.length > 0;
+  if (hadBefore && tags.length === 0) {
+    const really = confirm("このメディアについているタグを全て削除します。よろしいですか？");
+    if (!really) return; // キャンセル → 何もしない
+  }
+
+  try {
     const res = await fetch(
       joinPath(CONFIG.WORKER_ORIGIN, "/items/tag"),
       {
@@ -480,11 +484,7 @@ async function openTagEditor(item){
       return;
     }
 
-    // 成功：レスポンスの tags で item.tags を上書き
     item.tags = js.tags;
-
-    // 画面側のバッジを描き直したいので、
-    // いったんフォルダ全体を再描画（シンプルな方法）
     await renderFolder(currentManifestUrl);
   }catch(e){
     console.error(e);
