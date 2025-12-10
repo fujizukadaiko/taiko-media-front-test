@@ -65,7 +65,15 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 .controls button.btn{
   white-space:nowrap;
 }
-
+.controls input{
+  flex:2;
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#fff;
+  color:var(--text);
+  font-size:14px;
+}
 /* ── グリッド ── */
 .grid{
   display:grid;
@@ -112,6 +120,15 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 
   <div class="controls">
     <select id="folderSelect"><option>読み込み中…</option></select>
+
+    <!-- 追加: タグ絞り込み用の入力とボタン -->
+    <input
+      id="tagSearch"
+      type="text"
+      placeholder="タグで絞り込み（例: 発表 子どもの部）"
+    />
+    <button id="tagSearchBtn" class="btn ghost">絞り込み</button>
+
     <button id="bulkDownload" class="btn" disabled>原本DL (0)</button>
   </div>
 
@@ -156,6 +173,7 @@ const isVideo = (name='') => /\.(mp4|mov|webm|m4v)$/i.test(name);
 /* ===== 状態 ===== */
 let currentManifestUrl = "";
 let currentItems = [];
+let currentFolderMeta = { folderNasLink: null, date: null, title: "" };
 const selectedKeys = new Set();
 
 /* ===== フォルダ一覧読み込み → セレクタへ反映 ===== */
@@ -191,26 +209,39 @@ async function loadFolderIndex(){
   };
 }
 
-/* ===== フォルダ内アイテム読み込み → グリッド描画 ===== */
+/* ===== フォルダ内アイテム読み込み → 状態更新 + グリッド描画 ===== */
 async function renderFolder(manifestUrl){
   console.log("[manifest] url=", manifestUrl);
   const res = await fetch(manifestUrl);
   console.log("[manifest] status=", res.status);
   if (!res.ok) throw new Error("manifest fetch failed");
   const data = await res.json();
-  currentItems = data.items || [];
 
+  // 状態更新
+  currentItems = data.items || [];
+  currentFolderMeta = {
+    folderNasLink: data.folderNasLink || null,
+    date: data.date || null,
+    title: data.title || ""
+  };
+
+  // 実際の描画
+  drawGrid(currentItems);
+}
+
+/* ===== グリッド描画（items 配列をもとにカードを並べる） ===== */
+function drawGrid(items){
   const grid = $("#grid");
   grid.innerHTML = "";
 
   // 先頭に「フォルダNAS共有」バー（あれば）
-  if (data.folderNasLink && /^https?:\/\//.test(data.folderNasLink)){
+  if (currentFolderMeta.folderNasLink && /^https?:\/\//.test(currentFolderMeta.folderNasLink)){
     const bar = el("div", {
       className: "card",
       style: "padding:12px;border:1px dashed var(--border);background:#fff"
     });
     const a = el("a", {
-      href: data.folderNasLink,
+      href: currentFolderMeta.folderNasLink,
       target: "_blank",
       textContent: "フォルダごとダウンロード（NAS共有）"
     });
@@ -219,7 +250,7 @@ async function renderFolder(manifestUrl){
   }
 
   // ==== 各アイテムのカード描画 ====
-  for (const item of currentItems){
+  for (const item of items){
     const card = el("div", { className: "card" });
 
     // チェックボックス行
@@ -258,7 +289,7 @@ async function renderFolder(manifestUrl){
     }
     badges.appendChild(kindBadge);
 
-    // ② タグバッジ（D1 から返ってきた tags 配列）
+    // ② タグバッジ
     if (Array.isArray(item.tags)){
       for (const tagName of item.tags){
         const tagBadge = el("span", {
@@ -282,7 +313,7 @@ async function renderFolder(manifestUrl){
     });
     img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 
-    // 下部アクション（プレビュー）
+    // 下部アクション
     const meta = el("div", { className: "meta" });
     const actions = el("div", { className: "actions" });
 
@@ -312,21 +343,18 @@ async function renderFolder(manifestUrl){
       }
     };
     actions.appendChild(btnView);
-    
-    // タグ編集ボタンを追加
+
+    // タグ編集ボタン
     const btnTag = el("button", {
-      className: "btn",       // すでに CSS で定義されているボタンスタイルを利用
+      className: "btn",
       textContent: "タグ編集"
     });
-    btnTag.onclick = () => {
-      openTagEditor(item);
-    };
+    btnTag.onclick = () => openTagEditor(item);
     actions.appendChild(btnTag);
-    
-    // カード組み立て
+
+    meta.appendChild(actions);
     card.appendChild(chkWrap);
     card.appendChild(img);
-    meta.appendChild(actions);
     card.appendChild(meta);
     grid.appendChild(card);
   }
@@ -386,6 +414,34 @@ document.getElementById("v-close")?.addEventListener(
   () => document.getElementById("viewer")?.close()
 );
   
+// ==== タグ絞り込み（フォルダ内のみ） ====
+function applyTagFilterFromInput(){
+  const input = $("#tagSearch");
+  if (!input) return;
+
+  const q = input.value || "";
+  const words = q
+    .split(/\s+/)
+    .map(t => t.trim())
+    .filter(Boolean);
+
+  // 何も入力されていなければ元に戻す
+  if (words.length === 0){
+    drawGrid(currentItems);
+    return;
+  }
+
+  const filtered = currentItems.filter(item => {
+    const tags = Array.isArray(item.tags) ? item.tags : [];
+    // 全てのキーワードをどこかのタグが含んでいれば OK（AND 条件）
+    return words.every(w =>
+      tags.some(tag => tag.includes(w))
+    );
+  });
+
+  drawGrid(filtered);
+}
+  
 // ===== タグ編集（超シンプル版：prompt で編集） =====
 async function openTagEditor(item){
   // 現在のタグ配列 → "発表 子どもの部 かるがもマラソン" みたいな文字列へ
@@ -443,6 +499,24 @@ document.addEventListener("DOMContentLoaded", () => {
     a.href = CONFIG.UPLOAD_URL;
     a.target = "_self";
   }
+
+  // タグ検索ボタン
+  const btnSearch = document.getElementById("tagSearchBtn");
+  if (btnSearch){
+    btnSearch.addEventListener("click", () => applyTagFilterFromInput());
+  }
+
+  // Enter でも絞り込み
+  const input = document.getElementById("tagSearch");
+  if (input){
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter"){
+        e.preventDefault();
+        applyTagFilterFromInput();
+      }
+    });
+  }
+
   loadFolderIndex();
 });
 </script>
