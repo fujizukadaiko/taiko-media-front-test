@@ -249,6 +249,17 @@ const el = (t,props={}) => Object.assign(document.createElement(t), props);
 const joinPath = (base, path) => base.replace(/\/+$/,"") + path;
 const isVideo = (name='') => /\.(mp4|mov|webm|m4v)$/i.test(name);
 
+/** manifest が "/catalog?..." みたいなパスでも
+ *  "https://...workers.dev/catalog?..." に直すヘルパー
+ */
+function toWorkerUrl(pathOrUrl) {
+  if (!pathOrUrl) return "";
+  // すでに http(s) から始まるならそのまま
+  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
+  // 先頭が "/" などの相対パス → WORKER_ORIGIN を前にくっつける
+  return joinPath(CONFIG.WORKER_ORIGIN, pathOrUrl);
+}
+  
 /* ===== 状態 ===== */
 let currentManifestUrl = "";
 let currentItems = [];
@@ -266,12 +277,14 @@ async function loadFolderIndex(){
   sel.innerHTML = "";
 
   for (const f of folders){
-    const opt = el("option", {
-      value: f.manifest,
-      textContent: f.title ? `${f.date}｜${f.title}` : f.date
-    });
-    sel.appendChild(opt);
-  }
+  const manifestUrl = toWorkerUrl(f.manifest);  // ← ここで絶対URLに直す
+
+  const opt = el("option", {
+    value: manifestUrl,
+    textContent: f.title ? `${f.date}｜${f.title}` : f.date
+  });
+  sel.appendChild(opt);
+}
 
   if (folders.length){
     sel.value = folders[0].manifest;
