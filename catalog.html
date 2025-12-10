@@ -74,6 +74,15 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   color:var(--text);
   font-size:14px;
 }
+.controls input[type="text"]{
+  flex:1;
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#fff;
+  color:var(--text);
+  font-size:15px;
+}
 /* ── グリッド ── */
 .grid{
   display:grid;
@@ -118,8 +127,21 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
     </div>
   </header>
 
-  <div class="controls">
-    <select id="folderSelect"><option>読み込み中…</option></select>
+    <div class="controls">
+      <select id="folderSelect"><option>読み込み中…</option></select>
+      <button id="bulkDownload" class="btn" disabled>原本DL (0)</button>
+    </div>
+  
+    <!-- ▼ ここを追加：タグ検索行 ▼ -->
+    <div class="controls" id="tagControls">
+      <input
+        id="tagSearchInput"
+        type="text"
+        placeholder="タグ検索（例：発表 子どもの部）" />
+      <button id="tagSearchButton" class="btn ghost">検索</button>
+      <button id="tagSearchClear" class="btn ghost">解除</button>
+    </div>
+    <!-- ▲ 追加ここまで ▲ -->
 
     <!-- 追加: タグ絞り込み用の入力とボタン -->
     <input
@@ -208,8 +230,142 @@ async function loadFolderIndex(){
     await renderFolder(currentManifestUrl);
   };
 }
+/* ===== グリッド描画 共通関数 ===== */
+function renderGrid(items, folderNasLink){
+  currentItems = items || [];
 
-/* ===== フォルダ内アイテム読み込み → 状態更新 + グリッド描画 ===== */
+  const grid = $("#grid");
+  grid.innerHTML = "";
+
+  // 先頭に「フォルダNAS共有」バー（あれば）
+  if (folderNasLink && /^https?:\/\//.test(folderNasLink)){
+    const bar = el("div", {
+      className: "card",
+      style: "padding:12px;border:1px dashed var(--border);background:#fff"
+    });
+    const a = el("a", {
+      href: folderNasLink,
+      target: "_blank",
+      textContent: "フォルダごとダウンロード（NAS共有）"
+    });
+    bar.appendChild(a);
+    grid.appendChild(bar);
+  }
+
+  // ==== 各アイテムのカード描画 ====
+  for (const item of currentItems){
+    const card = el("div", { className: "card" });
+
+    // チェックボックス行
+    const chkWrap = el("div", {
+      style: "display:flex;align-items:center;gap:8px;padding:10px 12px"
+    });
+    const chk = el("input", { type: "checkbox" });
+    chk.onchange = () => {
+      if (chk.checked) selectedKeys.add(item.key);
+      else selectedKeys.delete(item.key);
+      updateBulkButton();
+    };
+    const label = el("div", { style: "flex:1" });
+
+    // タイトル
+    const title = el("div", {
+      className: "title",
+      textContent: item.title || (item.key?.split("/").pop() || "")
+    });
+
+    // バッジ（種別 + タグ）
+    const badges = el("div", { className: "badges" });
+
+    // 種別バッジ
+    const kind = isVideo(item.key) ? "video" : "image";
+    const kindBadge = el("span", {
+      className: "badge",
+      textContent: kind
+    });
+    if (kind === "video"){
+      kindBadge.style.color = "#2d5560";
+      kindBadge.style.background = "#eef8fb";
+    } else {
+      kindBadge.style.color = "#47644a";
+      kindBadge.style.background = "#f2f7f1";
+    }
+    badges.appendChild(kindBadge);
+
+    // タグバッジ
+    if (Array.isArray(item.tags)){
+      for (const tagName of item.tags){
+        const tagBadge = el("span", {
+          className: "badge",
+          textContent: tagName
+        });
+        badges.appendChild(tagBadge);
+      }
+    }
+
+    label.appendChild(title);
+    label.appendChild(badges);
+    chkWrap.appendChild(chk);
+    chkWrap.appendChild(label);
+
+    // サムネイル
+    const img = el("img", {
+      className: "thumb",
+      alt: item.title || ""
+    });
+    img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+
+    // 下部アクション
+    const meta = el("div", { className: "meta" });
+    const actions = el("div", { className: "actions" });
+
+    // プレビューボタン
+    const btnView = el("button", {
+      className: "view",
+      textContent: "プレビュー"
+    });
+    btnView.onclick = async () => {
+      try{
+        const pres = await fetch(
+          joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              key: item.key,
+              expires: CONFIG.PRESIGN_EXPIRES
+            })
+          }
+        );
+        const { url } = await pres.json();
+        if (!url) throw new Error("empty url");
+        openViewer(item.title || "", url, isVideo(item.key));
+      }catch(e){
+        console.error(e);
+        alert("プレビューURLの発行に失敗しました");
+      }
+    };
+    actions.appendChild(btnView);
+
+    // タグ編集ボタン
+    const btnTag = el("button", {
+      className: "btn",
+      textContent: "タグ編集"
+    });
+    btnTag.onclick = () => {
+      openTagEditor(item);
+    };
+    actions.appendChild(btnTag);
+
+    meta.appendChild(actions);
+
+    card.appendChild(chkWrap);
+    card.appendChild(img);
+    card.appendChild(meta);
+    grid.appendChild(card);
+  }
+}
+/* ===== フォルダ内アイテム読み込み → グリッド描画 ===== */
 async function renderFolder(manifestUrl){
   console.log("[manifest] url=", manifestUrl);
   const res = await fetch(manifestUrl);
@@ -217,18 +373,12 @@ async function renderFolder(manifestUrl){
   if (!res.ok) throw new Error("manifest fetch failed");
   const data = await res.json();
 
-  // 状態更新
-  currentItems = data.items || [];
-  currentFolderMeta = {
-    folderNasLink: data.folderNasLink || null,
-    date: data.date || null,
-    title: data.title || ""
-  };
+  const items = data.items || [];
+  const folderNasLink = data.folderNasLink || null;
 
-  // 実際の描画
-  drawGrid(currentItems);
+  renderGrid(items, folderNasLink);
 }
-
+  
 /* ===== グリッド描画（items 配列をもとにカードを並べる） ===== */
 function drawGrid(items){
   const grid = $("#grid");
@@ -491,6 +641,75 @@ async function openTagEditor(item){
     alert("タグ更新中にエラーが発生しました");
   }
 }
+
+// ===== タグ検索（AND条件・日付絞り optional） =====
+async function runTagSearch(){
+  const input = $("#tagSearchInput");
+  if (!input) return;
+
+  const raw = input.value.trim();
+  if (!raw) {
+    // 未入力なら現在のフォルダ表示に戻す
+    if (currentManifestUrl) {
+      await renderFolder(currentManifestUrl);
+    }
+    return;
+  }
+
+  // スペース区切り → ユニークなタグ配列
+  const tags = [...new Set(
+    raw.split(/\s+/)
+       .map(t => t.trim())
+       .filter(t => t.length > 0)
+  )];
+
+  if (!tags.length) {
+    if (currentManifestUrl) {
+      await renderFolder(currentManifestUrl);
+    }
+    return;
+  }
+
+  const params = new URLSearchParams();
+
+  for (const t of tags) {
+    params.append("tag", t);
+  }
+
+  // もし現在「日付フォルダ」が選択されていれば、その date で絞り込む
+  if (currentManifestUrl){
+    try{
+      const u = new URL(currentManifestUrl);
+      const d = u.searchParams.get("date");
+      if (d) params.set("date", d);
+    }catch(e){
+      console.warn("date 抽出に失敗しましたが、タグ検索自体は続行します:", e);
+    }
+  }
+
+  const url = `${CONFIG.WORKER_ORIGIN}/search/items?` + params.toString();
+
+  try{
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error("search/items status=", res.status);
+      alert("タグ検索に失敗しました");
+      return;
+    }
+    const js = await res.json();
+    if (!js.ok) {
+      console.error(js);
+      alert("タグ検索に失敗しました");
+      return;
+    }
+
+    // 検索結果をそのままグリッドに反映
+    renderGrid(js.items || [], null);
+  }catch(e){
+    console.error(e);
+    alert("タグ検索中にエラーが発生しました");
+  }
+}
   
 /* ===== 起動 ===== */
 document.addEventListener("DOMContentLoaded", () => {
@@ -500,22 +719,29 @@ document.addEventListener("DOMContentLoaded", () => {
     a.target = "_self";
   }
 
-  // タグ検索ボタン
-  const btnSearch = document.getElementById("tagSearchBtn");
-  if (btnSearch){
-    btnSearch.addEventListener("click", () => applyTagFilterFromInput());
-  }
+  // タグ検索 UI のイベント
+  const input = $("#tagSearchInput");
+  const btnSearch = $("#tagSearchButton");
+  const btnClear  = $("#tagSearchClear");
 
-  // Enter でも絞り込み
-  const input = document.getElementById("tagSearch");
-  if (input){
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter"){
-        e.preventDefault();
-        applyTagFilterFromInput();
-      }
-    });
-  }
+  btnSearch?.addEventListener("click", () => {
+    runTagSearch();
+  });
+
+  // Enter でも検索
+  input?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      runTagSearch();
+    }
+  });
+
+  // 解除ボタン：入力クリア & 現在のフォルダを再表示
+  btnClear?.addEventListener("click", async () => {
+    if (input) input.value = "";
+    if (currentManifestUrl) {
+      await renderFolder(currentManifestUrl);
+    }
+  });
 
   loadFolderIndex();
 });
