@@ -6,15 +6,14 @@
 <title>カタログ｜藤塚太鼓</title>
 <style>
 :root{
-  /* —— 共通パレット（アップロードに合わせた淡い緑系） —— */
-  --brand:#c1d8ac;         /* 主色：裏葉柳 */
-  --brand-d:#a9c890;       /* 濃いめ（枠/hover） */
-  --bgpage:#ebf6f7;        /* ページ地：藍白 */
-  --panel:#ffffff;         /* カード背景 */
-  --text:#1e2a1e;          /* 文字 */
-  --muted:#6f7f6a;         /* 補助文字 */
-  --border:#e6eedc;        /* 薄い枠線（カード/区切り） */
-  --chip:#f7fbf3;          /* ゴースト系の下地 */
+  --brand:#c1d8ac;
+  --brand-d:#a9c890;
+  --bgpage:#ebf6f7;
+  --panel:#ffffff;
+  --text:#1e2a1e;
+  --muted:#6f7f6a;
+  --border:#e6eedc;
+  --chip:#f7fbf3;
 }
 
 *{box-sizing:border-box}
@@ -49,7 +48,7 @@ a.btn:hover,button.btn:hover{filter:brightness(1.03);}
 a.btn:active,button.btn:active{transform:translateY(1px);}
 a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 
-/* ── フィルタ行（日付セレクタ＋DLボタン） ── */
+/* ── フィルタ行 ── */
 .controls{
   display:flex; align-items:center; justify-content:space-between;
   gap:10px; margin:0 0 18px;
@@ -65,15 +64,6 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 .controls button.btn{
   white-space:nowrap;
 }
-.controls input{
-  flex:2;
-  padding:8px 10px;
-  border:1px solid var(--border);
-  border-radius:10px;
-  background:#fff;
-  color:var(--text);
-  font-size:14px;
-}
 .controls input[type="text"]{
   flex:1;
   padding:8px 10px;
@@ -83,6 +73,7 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   color:var(--text);
   font-size:15px;
 }
+
 /* ── グリッド ── */
 .grid{
   display:grid;
@@ -110,11 +101,10 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 .actions button{flex:1;text-align:center;font-size:13px;padding:10px 12px;border-radius:12px;}
 .view{background:var(--chip);color:var(--text);border:1px solid var(--border);}
 
-/* フッター（中央・小さく・薄く） */
-  footer{
-    color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
-  }
-  
+/* フッター */
+footer{
+  color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
+}
 </style>
 </head>
 
@@ -127,46 +117,32 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
     </div>
   </header>
 
-    <div class="controls">
-      <select id="folderSelect"><option>読み込み中…</option></select>
-      <button id="bulkDownload" class="btn" disabled>原本DL (0)</button>
-    </div>
-  
-    <!-- ▼ ここを追加：タグ検索行 ▼ -->
-    <div class="controls" id="tagControls">
-      <input
-        id="tagSearchInput"
-        type="text"
-        placeholder="タグ検索（例：発表 子どもの部）" />
-      <button id="tagSearchButton" class="btn ghost">検索</button>
-      <button id="tagSearchClear" class="btn ghost">解除</button>
-    </div>
-    <!-- ▲ 追加ここまで ▲ -->
-
-    <!-- 追加: タグ絞り込み用の入力とボタン -->
-    <input
-      id="tagSearch"
-      type="text"
-      placeholder="タグで絞り込み（例: 発表 子どもの部）"
-    />
-    <button id="tagSearchBtn" class="btn ghost">絞り込み</button>
-
+  <div class="controls">
+    <select id="folderSelect"><option>読み込み中…</option></select>
     <button id="bulkDownload" class="btn" disabled>原本DL (0)</button>
+  </div>
+
+  <div class="controls" id="tagControls">
+    <input
+      id="tagSearchInput"
+      type="text"
+      placeholder="タグ検索（例：発表 子どもの部）" />
+    <button id="tagSearchButton" class="btn ghost">検索</button>
+    <button id="tagSearchClear" class="btn ghost">解除</button>
   </div>
 
   <div id="grid" class="grid"></div>
 
   <footer id="copyright"></footer>
   <script>
-    // 初出年を必要に応じて変更
     const FIRST_YEAR = 1996;
     const y = new Date().getFullYear();
     const range = (y === FIRST_YEAR) ? `${y}` : `${FIRST_YEAR}–${y}`;
-    // 実際の権利者名に置き換えてください
     const holder = "藤塚太鼓";
     document.getElementById("copyright").textContent = `© ${range} ${holder}`;
   </script>
 </div>
+
 <dialog id="viewer">
   <div class="modal-head">
     <strong id="v-title"></strong>
@@ -181,9 +157,9 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 /* ===== 設定 ===== */
 const CONFIG = {
   WORKER_ORIGIN: "https://taiko-worker-plain.fujizukadaiko.workers.dev",
-  INDEX_URL: "https://taiko-worker-plain.fujizukadaiko.workers.dev/catalog/index", // フォルダ索引
+  INDEX_URL: "https://taiko-worker-plain.fujizukadaiko.workers.dev/catalog/index",
   PRESIGN_EXPIRES: 300,
-  UPLOAD_URL: "https://fujizukadaiko.github.io/taiko-media-front-test/index.html" // ← 実URLに
+  UPLOAD_URL: "https://fujizukadaiko.github.io/taiko-media-front-test/index.html"
 };
 
 /* ===== 便利関数 ===== */
@@ -195,7 +171,6 @@ const isVideo = (name='') => /\.(mp4|mov|webm|m4v)$/i.test(name);
 /* ===== 状態 ===== */
 let currentManifestUrl = "";
 let currentItems = [];
-let currentFolderMeta = { folderNasLink: null, date: null, title: "" };
 const selectedKeys = new Set();
 
 /* ===== フォルダ一覧読み込み → セレクタへ反映 ===== */
@@ -230,6 +205,7 @@ async function loadFolderIndex(){
     await renderFolder(currentManifestUrl);
   };
 }
+
 /* ===== グリッド描画 共通関数 ===== */
 function renderGrid(items, folderNasLink){
   currentItems = items || [];
@@ -237,7 +213,6 @@ function renderGrid(items, folderNasLink){
   const grid = $("#grid");
   grid.innerHTML = "";
 
-  // 先頭に「フォルダNAS共有」バー（あれば）
   if (folderNasLink && /^https?:\/\//.test(folderNasLink)){
     const bar = el("div", {
       className: "card",
@@ -252,11 +227,9 @@ function renderGrid(items, folderNasLink){
     grid.appendChild(bar);
   }
 
-  // ==== 各アイテムのカード描画 ====
   for (const item of currentItems){
     const card = el("div", { className: "card" });
 
-    // チェックボックス行
     const chkWrap = el("div", {
       style: "display:flex;align-items:center;gap:8px;padding:10px 12px"
     });
@@ -268,16 +241,13 @@ function renderGrid(items, folderNasLink){
     };
     const label = el("div", { style: "flex:1" });
 
-    // タイトル
     const title = el("div", {
       className: "title",
       textContent: item.title || (item.key?.split("/").pop() || "")
     });
 
-    // バッジ（種別 + タグ）
     const badges = el("div", { className: "badges" });
 
-    // 種別バッジ
     const kind = isVideo(item.key) ? "video" : "image";
     const kindBadge = el("span", {
       className: "badge",
@@ -292,7 +262,6 @@ function renderGrid(items, folderNasLink){
     }
     badges.appendChild(kindBadge);
 
-    // タグバッジ
     if (Array.isArray(item.tags)){
       for (const tagName of item.tags){
         const tagBadge = el("span", {
@@ -308,18 +277,15 @@ function renderGrid(items, folderNasLink){
     chkWrap.appendChild(chk);
     chkWrap.appendChild(label);
 
-    // サムネイル
     const img = el("img", {
       className: "thumb",
       alt: item.title || ""
     });
     img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 
-    // 下部アクション
     const meta = el("div", { className: "meta" });
     const actions = el("div", { className: "actions" });
 
-    // プレビューボタン
     const btnView = el("button", {
       className: "view",
       textContent: "プレビュー"
@@ -347,7 +313,6 @@ function renderGrid(items, folderNasLink){
     };
     actions.appendChild(btnView);
 
-    // タグ編集ボタン
     const btnTag = el("button", {
       className: "btn",
       textContent: "タグ編集"
@@ -365,6 +330,7 @@ function renderGrid(items, folderNasLink){
     grid.appendChild(card);
   }
 }
+
 /* ===== フォルダ内アイテム読み込み → グリッド描画 ===== */
 async function renderFolder(manifestUrl){
   console.log("[manifest] url=", manifestUrl);
@@ -377,137 +343,6 @@ async function renderFolder(manifestUrl){
   const folderNasLink = data.folderNasLink || null;
 
   renderGrid(items, folderNasLink);
-}
-  
-/* ===== グリッド描画（items 配列をもとにカードを並べる） ===== */
-function drawGrid(items){
-  const grid = $("#grid");
-  grid.innerHTML = "";
-
-  // 先頭に「フォルダNAS共有」バー（あれば）
-  if (currentFolderMeta.folderNasLink && /^https?:\/\//.test(currentFolderMeta.folderNasLink)){
-    const bar = el("div", {
-      className: "card",
-      style: "padding:12px;border:1px dashed var(--border);background:#fff"
-    });
-    const a = el("a", {
-      href: currentFolderMeta.folderNasLink,
-      target: "_blank",
-      textContent: "フォルダごとダウンロード（NAS共有）"
-    });
-    bar.appendChild(a);
-    grid.appendChild(bar);
-  }
-
-  // ==== 各アイテムのカード描画 ====
-  for (const item of items){
-    const card = el("div", { className: "card" });
-
-    // チェックボックス行
-    const chkWrap = el("div", {
-      style: "display:flex;align-items:center;gap:8px;padding:10px 12px"
-    });
-    const chk = el("input", { type: "checkbox" });
-    chk.onchange = () => {
-      if (chk.checked) selectedKeys.add(item.key);
-      else selectedKeys.delete(item.key);
-      updateBulkButton();
-    };
-    const label = el("div", { style: "flex:1" });
-
-    // タイトル
-    const title = el("div", {
-      className: "title",
-      textContent: item.title || (item.key?.split("/").pop() || "")
-    });
-
-    // バッジ（種別 + タグ）
-    const badges = el("div", { className: "badges" });
-
-    // ① 種別バッジ（video / image）
-    const kind = isVideo(item.key) ? "video" : "image";
-    const kindBadge = el("span", {
-      className: "badge",
-      textContent: kind
-    });
-    if (kind === "video"){
-      kindBadge.style.color = "#2d5560";
-      kindBadge.style.background = "#eef8fb";
-    } else {
-      kindBadge.style.color = "#47644a";
-      kindBadge.style.background = "#f2f7f1";
-    }
-    badges.appendChild(kindBadge);
-
-    // ② タグバッジ
-    if (Array.isArray(item.tags)){
-      for (const tagName of item.tags){
-        const tagBadge = el("span", {
-          className: "badge",
-          textContent: tagName
-        });
-        badges.appendChild(tagBadge);
-      }
-    }
-
-    // label 組み立て
-    label.appendChild(title);
-    label.appendChild(badges);
-    chkWrap.appendChild(chk);
-    chkWrap.appendChild(label);
-
-    // サムネイル
-    const img = el("img", {
-      className: "thumb",
-      alt: item.title || ""
-    });
-    img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
-
-    // 下部アクション
-    const meta = el("div", { className: "meta" });
-    const actions = el("div", { className: "actions" });
-
-    const btnView = el("button", {
-      className: "view",
-      textContent: "プレビュー"
-    });
-    btnView.onclick = async () => {
-      try{
-        const pres = await fetch(
-          joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              key: item.key,
-              expires: CONFIG.PRESIGN_EXPIRES
-            })
-          }
-        );
-        const { url } = await pres.json();
-        if (!url) throw new Error("empty url");
-        openViewer(item.title || "", url, isVideo(item.key));
-      }catch(e){
-        console.error(e);
-        alert("プレビューURLの発行に失敗しました");
-      }
-    };
-    actions.appendChild(btnView);
-
-    // タグ編集ボタン
-    const btnTag = el("button", {
-      className: "btn",
-      textContent: "タグ編集"
-    });
-    btnTag.onclick = () => openTagEditor(item);
-    actions.appendChild(btnTag);
-
-    meta.appendChild(actions);
-    card.appendChild(chkWrap);
-    card.appendChild(img);
-    card.appendChild(meta);
-    grid.appendChild(card);
-  }
 }
 
 /* ===== 原本DL(複数) ===== */
@@ -563,36 +398,8 @@ document.getElementById("v-close")?.addEventListener(
   "click",
   () => document.getElementById("viewer")?.close()
 );
-  
-// ==== タグ絞り込み（フォルダ内のみ） ====
-function applyTagFilterFromInput(){
-  const input = $("#tagSearch");
-  if (!input) return;
 
-  const q = input.value || "";
-  const words = q
-    .split(/\s+/)
-    .map(t => t.trim())
-    .filter(Boolean);
-
-  // 何も入力されていなければ元に戻す
-  if (words.length === 0){
-    drawGrid(currentItems);
-    return;
-  }
-
-  const filtered = currentItems.filter(item => {
-    const tags = Array.isArray(item.tags) ? item.tags : [];
-    // 全てのキーワードをどこかのタグが含んでいれば OK（AND 条件）
-    return words.every(w =>
-      tags.some(tag => tag.includes(w))
-    );
-  });
-
-  drawGrid(filtered);
-}
-  
-// ===== タグ編集（超シンプル版：prompt で編集） =====
+/* ===== タグ編集（prompt版） ===== */
 async function openTagEditor(item){
   const currentText = Array.isArray(item.tags) ? item.tags.join(" ") : "";
 
@@ -607,14 +414,13 @@ async function openTagEditor(item){
     .map(t => t.trim())
     .filter(t => t.length > 0);
 
-  // ★ ここ：元々タグあったのに、今回ゼロになっている＝実質「全部削除」
   const hadBefore = Array.isArray(item.tags) && item.tags.length > 0;
   if (hadBefore && tags.length === 0) {
     const really = confirm("このメディアについているタグを全て削除します。よろしいですか？");
-    if (!really) return; // キャンセル → 何もしない
+    if (!really) return;
   }
 
-  try {
+  try{
     const res = await fetch(
       joinPath(CONFIG.WORKER_ORIGIN, "/items/tag"),
       {
@@ -642,21 +448,19 @@ async function openTagEditor(item){
   }
 }
 
-// ===== タグ検索（AND条件・日付絞り optional） =====
+/* ===== タグ検索（AND条件・日付絞り optional） ===== */
 async function runTagSearch(){
   const input = $("#tagSearchInput");
   if (!input) return;
 
   const raw = input.value.trim();
   if (!raw) {
-    // 未入力なら現在のフォルダ表示に戻す
     if (currentManifestUrl) {
       await renderFolder(currentManifestUrl);
     }
     return;
   }
 
-  // スペース区切り → ユニークなタグ配列
   const tags = [...new Set(
     raw.split(/\s+/)
        .map(t => t.trim())
@@ -671,12 +475,10 @@ async function runTagSearch(){
   }
 
   const params = new URLSearchParams();
-
   for (const t of tags) {
     params.append("tag", t);
   }
 
-  // もし現在「日付フォルダ」が選択されていれば、その date で絞り込む
   if (currentManifestUrl){
     try{
       const u = new URL(currentManifestUrl);
@@ -703,14 +505,13 @@ async function runTagSearch(){
       return;
     }
 
-    // 検索結果をそのままグリッドに反映
     renderGrid(js.items || [], null);
   }catch(e){
     console.error(e);
     alert("タグ検索中にエラーが発生しました");
   }
 }
-  
+
 /* ===== 起動 ===== */
 document.addEventListener("DOMContentLoaded", () => {
   const a = document.getElementById("toCatalog");
@@ -719,7 +520,6 @@ document.addEventListener("DOMContentLoaded", () => {
     a.target = "_self";
   }
 
-  // タグ検索 UI のイベント
   const input = $("#tagSearchInput");
   const btnSearch = $("#tagSearchButton");
   const btnClear  = $("#tagSearchClear");
@@ -728,14 +528,12 @@ document.addEventListener("DOMContentLoaded", () => {
     runTagSearch();
   });
 
-  // Enter でも検索
   input?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       runTagSearch();
     }
   });
 
-  // 解除ボタン：入力クリア & 現在のフォルダを再表示
   btnClear?.addEventListener("click", async () => {
     if (input) input.value = "";
     if (currentManifestUrl) {
