@@ -101,6 +101,87 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 .actions button{flex:1;text-align:center;font-size:13px;padding:10px 12px;border-radius:12px;}
 .view{background:var(--chip);color:var(--text);border:1px solid var(--border);}
 
+  /* ==== プレビュー用モーダル調整 ==== */
+dialog#viewer {
+  border: none;
+  padding: 0;
+  max-width: min(900px, 95vw);  /* PC でもスマホでもはみ出さない */
+  width: 95vw;
+  max-height: 90vh;             /* 画面からはみ出さない */
+  margin: auto;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+dialog#viewer::backdrop {
+  background: rgba(0, 0, 0, 0.45); /* うっすら暗くする */
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 14px;
+}
+
+.modal-head strong {
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-head button {
+  border: 1px solid var(--border);
+  background: var(--chip);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 10px 14px 16px;
+  background: #fafdf9;
+}
+
+/* 中身の画像 / 動画は「枠内に収まる」＆「引き伸ばしすぎない」 */
+#v-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#v-container img,
+#v-container video {
+  max-width: 100%;
+  max-height: 70vh;   /* 画面高さの 70% まで */
+  width: auto;
+  height: auto;
+  object-fit: contain; /* 収まり優先でトリミングしない */
+  border-radius: 10px;
+  background: #000;    /* 動画や縦長画像の余白が黒背景になる */
+}
+
+/* スマホだと少し縦を広めに使う */
+@media (max-width: 600px) {
+  dialog#viewer {
+    width: 96vw;
+    max-width: 96vw;
+    max-height: 90vh;
+  }
+  #v-container img,
+  #v-container video {
+    max-height: 75vh;
+  }
+}
+  
 /* フッター */
 footer{
   color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
@@ -208,6 +289,8 @@ async function loadFolderIndex(){
 
 /* ===== グリッド描画 共通関数 ===== */
 function renderGrid(items, folderNasLink){
+  selectedKeys.clear();
+  updateBulkButton();
   currentItems = items || [];
 
   const grid = $("#grid");
@@ -285,13 +368,25 @@ function renderGrid(items, folderNasLink){
 
     const meta = el("div", { className: "meta" });
     const actions = el("div", { className: "actions" });
-
+    
+    // プレビューボタン
     const btnView = el("button", {
       className: "view",
       textContent: "プレビュー"
     });
     btnView.onclick = async () => {
-      try{
+      try {
+        // ★ NAS の場合：その URL を直接ビューアに渡す
+        if (item.storage === "nas" && item.nasUrl) {
+          openViewer(
+            item.title || "",
+            item.nasUrl,
+            isVideo(item.nasUrl || item.key)
+          );
+          return;
+        }
+
+        // ★ それ以外（B2想定）は従来どおり presign-get
         const pres = await fetch(
           joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
           {
@@ -306,7 +401,7 @@ function renderGrid(items, folderNasLink){
         const { url } = await pres.json();
         if (!url) throw new Error("empty url");
         openViewer(item.title || "", url, isVideo(item.key));
-      }catch(e){
+      } catch (e) {
         console.error(e);
         alert("プレビューURLの発行に失敗しました");
       }
@@ -352,23 +447,46 @@ function updateBulkButton(){
   btn.textContent = `原本DL (${n})`;
   btn.disabled = n === 0;
 }
-document.getElementById("bulkDownload")?.addEventListener("click", async ()=>{
+document.getElementById("bulkDownload")?.addEventListener("click", async () => {
   if (selectedKeys.size === 0) return;
+
   const keys = Array.from(selectedKeys);
-  for (const key of keys){
-    try{
-      const pres = await fetch(joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"), {
-        method:"POST",
-        headers:{ "content-type":"application/json" },
-        body: JSON.stringify({ key, expires: CONFIG.PRESIGN_EXPIRES, attachment: true })
-      });
+
+  for (const key of keys) {
+    try {
+      // currentItems から、対応する item 情報を探す
+      const item = currentItems.find((it) => it.key === key);
+
+      // ★ NAS の場合：nasUrl に直接飛ばす
+      if (item && item.storage === "nas" && item.nasUrl) {
+        const w = window.open(item.nasUrl, "_blank");
+        if (!w) location.href = item.nasUrl;
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
+
+      // ★ それ以外は B2 presign-get で原本DL
+      const pres = await fetch(
+        joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            key,
+            expires: CONFIG.PRESIGN_EXPIRES,
+            attachment: true,
+          }),
+        }
+      );
       const { url } = await pres.json();
-      if (url){
+      if (url) {
         const w = window.open(url, "_blank");
         if (!w) location.href = url;
       }
-      await new Promise(r=>setTimeout(r, 400));
-    }catch(e){ console.error(e); }
+      await new Promise((r) => setTimeout(r, 400));
+    } catch (e) {
+      console.error(e);
+    }
   }
 });
 
