@@ -395,6 +395,7 @@ function toWorkerUrl(pathOrUrl) {
 /* ===== 状態 ===== */
 let currentManifestUrl = "";
 let currentItems = [];
+let currentFolderNasLink = null;   // ★ 追加：NASリンク（今は null のままでもOK）
 const selectedKeys = new Set();
 // ★ 追加：現在選択中フォルダのメタ情報
 let currentFolderMeta = {
@@ -638,10 +639,14 @@ async function renderFolder(manifestUrl){
     place: data.place || null,
     note: data.note || null,
   };
-  updateFolderHeader();   // ← 後で定義する関数
+  updateFolderHeader();
 
   const items = data.items || [];
-  currentItems = items;                                  // ← 追加：現フォルダのアイテムを覚えておく
+  currentItems = items;
+
+  // ★ いまは使わなくても、とりあえず data.folderNasLink を拾っておく
+  const folderNasLink = data.folderNasLink || null;
+  currentFolderNasLink = folderNasLink;
 
   renderGrid(items, folderNasLink);
 }
