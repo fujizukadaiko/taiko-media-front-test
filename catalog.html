@@ -489,7 +489,16 @@ function updateBulkButton() {
   btn.textContent = `原本DL (${n})`;
   btn.disabled = n === 0;
 }
-
+function triggerDownload(url) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";   // なくてもOKだがあっても良い
+  a.rel = "noopener";
+  a.download = "";       // filename は header 側の Content-Disposition を優先
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 document.getElementById("bulkDownload")?.addEventListener("click", async () => {
   if (selectedKeys.size === 0) return;
 
@@ -497,7 +506,6 @@ document.getElementById("bulkDownload")?.addEventListener("click", async () => {
 
   for (const key of keys) {
     try {
-      // ★ すべて B2 presign-get 経由で原本DL
       const pres = await fetch(
         joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
         {
@@ -506,7 +514,7 @@ document.getElementById("bulkDownload")?.addEventListener("click", async () => {
           body: JSON.stringify({
             key,
             expires: CONFIG.PRESIGN_EXPIRES,
-            attachment: true, // ← ダウンロードさせたいので true のままでOK
+            attachment: true,
           }),
         }
       );
@@ -518,12 +526,9 @@ document.getElementById("bulkDownload")?.addEventListener("click", async () => {
 
       const { url } = await pres.json();
       if (url) {
-        const w = window.open(url, "_blank");
-        // ポップアップブロックされた場合の保険
-        if (!w) location.href = url;
+        triggerDownload(url);
       }
 
-      // 連続DLで怒られにくくする小さい待ち
       await new Promise((r) => setTimeout(r, 400));
     } catch (e) {
       console.error(e);
