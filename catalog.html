@@ -163,7 +163,8 @@ body.select-mode .card button{
 /* ── グリッド ── */
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  /* PC では 230px 幅を目安に自動で 3〜4 列 */
+  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
   gap:14px;
 }
 .card{
@@ -173,32 +174,91 @@ body.select-mode .card button{
   overflow:hidden;
   box-shadow:0 4px 18px rgba(0,0,0,.06);
 }
-.thumb{width:100%;aspect-ratio:4/3;object-fit:cover;background:#f2f6ee;}
+.thumb{
+  width:100%;
+  aspect-ratio:4/3;
+  object-fit:cover;
+  background:#f2f6ee;
+}
 .meta{padding:12px 14px;}
-.title{font-size:14px;margin:0 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#2c3d2c;}
-.badges{display:flex;gap:6px;flex-wrap:wrap;}
+.title{
+  font-size:14px;
+  margin:0 0 8px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:#2c3d2c;
+}
+.badges{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
 .badge{
-  font-size:11px;color:var(--muted);
+  font-size:11px;
+  color:var(--muted);
   background:var(--chip);
   border:1px solid var(--border);
-  padding:4px 8px;border-radius:999px;
+  padding:4px 8px;
+  border-radius:999px;
 }
+
 /* ボタンを常に縦2段にする */
 .actions{
   display:flex;
-  flex-direction:column;   /* ★ 縦並び */
+  flex-direction:column;
   gap:6px;
   margin-top:10px;
 }
-
 .actions button{
-  width:100%;              /* ★ カード幅いっぱい */
+  width:100%;
   text-align:center;
   font-size:13px;
   padding:10px 12px;
   border-radius:12px;
 }
-.view{background:var(--chip);color:var(--text);border:1px solid var(--border);}
+.view{
+  background:var(--chip);
+  color:var(--text);
+  border:1px solid var(--border);
+}
+
+/* サブタイトル（ヘッダの2行目） */
+.folder-header{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  display:block;
+  max-width:100%;
+}
+
+/* ==== モバイル用レイアウト調整 ==== */
+@media (max-width: 768px){
+  /* サムネを2列にする */
+  .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .card{
+    border-radius:12px;
+  }
+  .meta{
+    padding:8px 10px;
+  }
+  .title{
+    font-size:12px;
+  }
+
+  /* フィルタ行：1段目にプルダウンをフル幅で置く */
+  .controls{
+    flex-wrap:wrap;
+  }
+  .controls select{
+    flex-basis:100%;  /* 1行占有して幅いっぱい */
+  }
+}
 
   /* ==== プレビュー用モーダル調整 ==== */
 dialog#viewer {
