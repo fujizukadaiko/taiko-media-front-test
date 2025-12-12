@@ -335,24 +335,34 @@ async function initLiffIfPossible(){
   return liffReady;
 }
 
-async function openExternal(url){
-  if (isLine){
-    // LINE内ならLIFFのexternalで確実に外部ブラウザへ
-    await initLiffIfPossible();
-    try{
-      if (window.liff && liff.isInClient()){
-        liff.openWindow({ url, external: true });
-        return;
-      }
-    }catch(_){}
-    // 保険：同タブ遷移（_blankがブロックされることがある）
-    location.replace(url);
+ // ★ LIFFで開かれたときは即 外部ブラウザへ飛ばす -----------------
+document.addEventListener("DOMContentLoaded", async () => {
+  // まず「LINEアプリ内で開いているか」だけ軽くチェック
+  if (!isLine) return;
+
+  // LIFF SDK 初期化
+  const ok = await initLiffIfPossible();
+  if (!ok) {
+    console.warn("LIFF init に失敗したので、通常ブラウザとして続行します");
     return;
   }
-  // 通常ブラウザ
-  const w = window.open(url, "_blank");
-  if (!w) location.href = url;
-}
+
+  try {
+    // LINEアプリ内の LIFF クライアントかどうか
+    if (liff.isInClient()) {
+      // ✅ ここで外部ブラウザにこのページ（STANDALONE_URL）を開かせる
+      liff.openWindow({
+        url: STANDALONE_URL, // 例: https://fujizukadaiko.github.io/taiko-media-front-test/index.html
+        external: true,
+      });
+
+      // この LIFF タブ自体を JS で閉じることはできないので、
+      // ユーザーには外部ブラウザ側を使ってもらう想定。
+    }
+  } catch (e) {
+    console.error("LIFF external open failed:", e);
+  }
+});
   
 /** ===== 便利関数 ===== */
 const $ = (s,p=document)=>p.querySelector(s);
