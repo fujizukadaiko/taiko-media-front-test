@@ -292,8 +292,8 @@ async function loadFolderIndex(){
   if (!sel) return;
   sel.innerHTML = "";
 
-  for (const f of folders){
-  const manifestUrl = toWorkerUrl(f.manifest);  // ← ここで絶対URLに直す
+ for (const f of folders){
+  const manifestUrl = toWorkerUrl(f.manifest);
 
   const opt = el("option", {
     value: manifestUrl,
@@ -302,11 +302,13 @@ async function loadFolderIndex(){
   sel.appendChild(opt);
 }
 
-  if (folders.length){
-    sel.value = folders[0].manifest;
-    currentManifestUrl = sel.value;
-  }
-  if (currentManifestUrl) await renderFolder(currentManifestUrl);
+// ★ 初期選択も manifestUrl を使う
+if (folders.length){
+  const firstManifest = toWorkerUrl(folders[0].manifest);
+  sel.value = firstManifest;
+  currentManifestUrl = firstManifest;
+}
+if (currentManifestUrl) await renderFolder(currentManifestUrl);
 
   sel.onchange = async ()=>{
     selectedKeys.clear();
@@ -405,17 +407,7 @@ function renderGrid(items, folderNasLink){
     });
     btnView.onclick = async () => {
       try {
-        // ★ NAS の場合：その URL を直接ビューアに渡す
-        if (item.storage === "nas" && item.nasUrl) {
-          openViewer(
-            item.title || "",
-            item.nasUrl,
-            isVideo(item.nasUrl || item.key)
-          );
-          return;
-        }
-
-        // ★ それ以外（B2想定）は従来どおり presign-get
+        // ★ すべて B2 presign-get で取得（NAS 分岐は削除）
         const pres = await fetch(
           joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
           {
@@ -427,8 +419,16 @@ function renderGrid(items, folderNasLink){
             })
           }
         );
+    
+        if (!pres.ok) {
+          console.error("presign-get failed:", pres.status);
+          alert("プレビューURLの発行に失敗しました");
+          return;
+        }
+    
         const { url } = await pres.json();
         if (!url) throw new Error("empty url");
+    
         openViewer(item.title || "", url, isVideo(item.key));
       } catch (e) {
         console.error(e);
