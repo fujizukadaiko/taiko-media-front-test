@@ -477,14 +477,19 @@ async function renderFolder(manifestUrl){
 
   renderGrid(items, folderNasLink);
 }
-
+  
 /* ===== 原本DL(複数) ===== */
-function updateBulkButton(){
-  const btn = $("#bulkDownload");
+function updateBulkButton() {
   const n = selectedKeys.size;
+
+  // jQuery を使うより、素直に DOM 取っちゃった方が安全
+  const btn = document.getElementById("bulkDownload");
+  if (!btn) return;
+
   btn.textContent = `原本DL (${n})`;
   btn.disabled = n === 0;
 }
+
 document.getElementById("bulkDownload")?.addEventListener("click", async () => {
   if (selectedKeys.size === 0) return;
 
@@ -492,18 +497,7 @@ document.getElementById("bulkDownload")?.addEventListener("click", async () => {
 
   for (const key of keys) {
     try {
-      // currentItems から、対応する item 情報を探す
-      const item = currentItems.find((it) => it.key === key);
-
-      // ★ NAS の場合：nasUrl に直接飛ばす
-      if (item && item.storage === "nas" && item.nasUrl) {
-        const w = window.open(item.nasUrl, "_blank");
-        if (!w) location.href = item.nasUrl;
-        await new Promise((r) => setTimeout(r, 400));
-        continue;
-      }
-
-      // ★ それ以外は B2 presign-get で原本DL
+      // ★ すべて B2 presign-get 経由で原本DL
       const pres = await fetch(
         joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
         {
@@ -512,15 +506,24 @@ document.getElementById("bulkDownload")?.addEventListener("click", async () => {
           body: JSON.stringify({
             key,
             expires: CONFIG.PRESIGN_EXPIRES,
-            attachment: true,
+            attachment: true, // ← ダウンロードさせたいので true のままでOK
           }),
         }
       );
+
+      if (!pres.ok) {
+        console.error("presign-get failed:", pres.status);
+        continue;
+      }
+
       const { url } = await pres.json();
       if (url) {
         const w = window.open(url, "_blank");
+        // ポップアップブロックされた場合の保険
         if (!w) location.href = url;
       }
+
+      // 連続DLで怒られにくくする小さい待ち
       await new Promise((r) => setTimeout(r, 400));
     } catch (e) {
       console.error(e);
