@@ -188,7 +188,50 @@ dialog#viewer::backdrop {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}  
+}
+  /* ==== ZIP作成ダイアログ ==== */
+#zipDialog {
+  border: none;
+  padding: 0;
+  max-width: min(420px, 95vw);
+  width: 95vw;
+  margin: auto;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+#zipDialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.zip-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.zip-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: #e6eef2;
+  overflow: hidden;
+}
+
+#zipBarFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--brand-d);
+  transition: width 0.15s linear;
+}
+
+.zip-progress-text {
+  font-size: 12px;
+  color: var(--muted);
+}
 /* フッター */
 footer{
   color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
@@ -244,6 +287,22 @@ footer{
   </div>
 </dialog>
 
+  <dialog id="zipDialog">
+  <div class="modal-head">
+    <strong id="zipTitle">ZIP作成中…</strong>
+  </div>
+  <div class="modal-body">
+    <p id="zipStatus" style="margin: 0 0 8px; font-size: 13px;">
+      サーバーでZIPファイルを作成しています…
+    </p>
+    <div class="zip-progress">
+      <div class="zip-bar">
+        <div id="zipBarFill"></div>
+      </div>
+      <div id="zipProgressText" class="zip-progress-text">0%</div>
+    </div>
+  </div>
+</dialog>
 <script>
 /* ===== 設定 ===== */
 const CONFIG = {
@@ -478,7 +537,7 @@ async function renderFolder(manifestUrl){
   renderGrid(items, folderNasLink);
 }
   
-/* ===== 原本DL(複数) → ZIP DL に変更 ===== */
+/* ===== 原本DL(複数) → ZIP一括DL ===== */
 function updateBulkButton() {
   const n = selectedKeys.size;
   const btn = document.getElementById("bulkDownload");
@@ -491,54 +550,53 @@ document.getElementById("bulkDownload")?.addEventListener("click", async () => {
   if (selectedKeys.size === 0) return;
 
   const keys = Array.from(selectedKeys);
-  const btn = document.getElementById("bulkDownload");
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "ZIP 準備中…";
+
+  // 件数チェック（サーバー側でもチェックしている想定だけど念のため）
+  if (keys.length > 100) {
+    alert("一度にダウンロードできるのは最大100件までです。枚数を減らしてください。");
+    return;
+  }
+
+  showZipDialog();
 
   try {
-    // ZIP ファイル名：とりあえず日付ベースに（ASCII だけにしておく）
-    let baseName = "media";
-    if (currentFolderMeta && currentFolderMeta.date) {
-      baseName = currentFolderMeta.date; // 例: 20251102
-    }
-    const zipName = `${baseName}.zip`;
-
     const res = await fetch(
       joinPath(CONFIG.WORKER_ORIGIN, "/files/zip"),
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          keys,
-          name: zipName,   // Worker 側で Content-Disposition に使う用
-        }),
+        body: JSON.stringify({ keys }),
       }
     );
 
     if (!res.ok) {
       console.error("zip failed:", res.status);
-      alert("ZIP の作成に失敗しました");
+      finishZipDialog(false);
       return;
     }
 
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const url  = URL.createObjectURL(blob);
+
+    // フォルダの日付を ZIP 名に使う（なければ "download"）
+    const baseName =
+      (currentFolderMeta && currentFolderMeta.date) ||
+      "download";
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = zipName;   // ダウンロードファイル名（クライアント側）
+    a.download = `${baseName}.zip`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // URL開放
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    finishZipDialog(true);
   } catch (e) {
     console.error(e);
-    alert("ZIP ダウンロード中にエラーが発生しました");
-  } finally {
-    // ボタンの表示を元に戻す（選択数が変わっている可能性もあるので再計算）
-    btn.disabled = selectedKeys.size === 0;
-    btn.textContent = originalLabel;
+    finishZipDialog(false);
   }
 });
 
@@ -568,7 +626,66 @@ document.getElementById("v-close")?.addEventListener(
   "click",
   () => document.getElementById("viewer")?.close()
 );
+/* ===== ZIP作成ダイアログ制御 ===== */
+let zipProgressTimer = null;
 
+function showZipDialog() {
+  const dlg   = document.getElementById("zipDialog");
+  const title = document.getElementById("zipTitle");
+  const msg   = document.getElementById("zipStatus");
+  const bar   = document.getElementById("zipBarFill");
+  const txt   = document.getElementById("zipProgressText");
+
+  if (!dlg) return;
+
+  if (title) title.textContent = "ZIP作成中…";
+  if (msg)   msg.textContent   = "サーバーでZIPファイルを作成しています…";
+  if (bar)   bar.style.width   = "0%";
+  if (txt)   txt.textContent   = "0%";
+
+  dlg.showModal();
+
+  // 疑似プログレス（〜90% までゆっくり上がる）
+  let p = 5;
+  if (zipProgressTimer) clearInterval(zipProgressTimer);
+  zipProgressTimer = setInterval(() => {
+    p = Math.min(p + Math.random() * 5, 90);
+    if (bar) bar.style.width = p + "%";
+    if (txt) txt.textContent = Math.round(p) + "%";
+  }, 300);
+}
+
+function finishZipDialog(success) {
+  const dlg   = document.getElementById("zipDialog");
+  const title = document.getElementById("zipTitle");
+  const msg   = document.getElementById("zipStatus");
+  const bar   = document.getElementById("zipBarFill");
+  const txt   = document.getElementById("zipProgressText");
+
+  if (zipProgressTimer) {
+    clearInterval(zipProgressTimer);
+    zipProgressTimer = null;
+  }
+
+  if (bar) bar.style.width = "100%";
+  if (txt) txt.textContent = "100%";
+
+  if (title) {
+    title.textContent = success
+      ? "ダウンロードを開始しました"
+      : "ZIPの作成に失敗しました";
+  }
+  if (msg) {
+    msg.textContent = success
+      ? "ブラウザのダウンロード一覧からZIPファイルをご確認ください。"
+      : "ZIPの作成に失敗しました。選択枚数を減らして再度お試しください。";
+  }
+
+  // 1.8秒くらい表示してから自動で閉じる
+  setTimeout(() => {
+    try { dlg && dlg.close(); } catch (_) {}
+  }, 1800);
+}
 /* ===== タグ編集（prompt版） ===== */
 async function openTagEditor(item){
   const currentText = Array.isArray(item.tags) ? item.tags.join(" ") : "";
