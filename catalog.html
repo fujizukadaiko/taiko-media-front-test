@@ -73,7 +73,67 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   color:var(--text);
   font-size:15px;
 }
+/* ==== 選択モード / 選択状態の見た目 ==== */
 
+/* カードが選択されているときの枠＆光り方 */
+.card.selected{
+  border-color: var(--brand-d);
+  box-shadow: 0 0 0 2px rgba(161, 212, 221, 0.7);
+}
+
+/* チェックボックスを丸く・大きめにする */
+.card-check{
+  width: 20px;
+  height: 20px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: #fff;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color .15s, background-color .15s;
+}
+
+.card-check::after{
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 999px;
+  background: var(--brand);
+  opacity: 0;
+  transition: opacity .15s;
+}
+
+.card-check:checked{
+  border-color: var(--brand-d);
+  background: #f0faf4;
+}
+
+.card-check:checked::after{
+  opacity: 1;
+}
+
+/* 選択モードじゃないときはチェックを薄く＆操作不可にする */
+body:not(.select-mode) .card-check{
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 選択モードのときは見えるように */
+body.select-mode .card-check{
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* カード全体が選択可能っぽく見えるように（選択モード中のみ） */
+body.select-mode .card{
+  cursor: pointer;
+}
+body.select-mode .card button{
+  cursor: pointer;
+}
 /* ── グリッド ── */
 .grid{
   display:grid;
@@ -251,9 +311,12 @@ footer{
     </div>
   </header>
 
-  <div class="controls">
+    <div class="controls">
     <select id="folderSelect"><option>読み込み中…</option></select>
-    <button id="bulkDownload" class="btn" disabled>原本DL (0)</button>
+    <button id="toggleSelectMode" class="btn ghost">選択モード</button>
+    <button id="selectAll" class="btn ghost" disabled>全選択</button>
+    <button id="clearSelection" class="btn ghost" disabled>全解除</button>
+    <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
   </div>
 
   <div class="controls" id="tagControls">
@@ -340,6 +403,10 @@ let currentFolderMeta = {
   place: null,
   note: null,
 };
+
+// ★ 追加：選択モード ON/OFF
+let selectionMode = false;
+  
 /* ===== フォルダ一覧読み込み → セレクタへ反映 ===== */
 async function loadFolderIndex(){
   const res = await fetch(CONFIG.INDEX_URL);
@@ -379,12 +446,14 @@ if (currentManifestUrl) await renderFolder(currentManifestUrl);
 
 /* ===== グリッド描画 共通関数 ===== */
 function renderGrid(items, folderNasLink){
-  selectedKeys.clear();
-  updateBulkButton();
+  // 状態を更新
   currentItems = items || [];
-
   const grid = $("#grid");
   grid.innerHTML = "";
+
+  // 選択状態は一旦リセットしない（モードOFFでclear済み）
+  updateBulkButton();
+  updateSelectButtonsState();
 
   if (folderNasLink && /^https?:\/\//.test(folderNasLink)){
     const bar = el("div", {
@@ -403,15 +472,32 @@ function renderGrid(items, folderNasLink){
   for (const item of currentItems){
     const card = el("div", { className: "card" });
 
+    // このカードの選択状態をまとめて更新する関数
+    const setSelected = (on) => {
+      if (on) {
+        selectedKeys.add(item.key);
+      } else {
+        selectedKeys.delete(item.key);
+      }
+      chk.checked = on;
+      card.classList.toggle("selected", on);
+      updateBulkButton();
+      updateSelectButtonsState();
+    };
+
     const chkWrap = el("div", {
       style: "display:flex;align-items:center;gap:8px;padding:10px 12px"
     });
-    const chk = el("input", { type: "checkbox" });
+    const chk = el("input", {
+      type: "checkbox",
+      className: "card-check"
+    });
+
+    // チェックボックス直接操作
     chk.onchange = () => {
-      if (chk.checked) selectedKeys.add(item.key);
-      else selectedKeys.delete(item.key);
-      updateBulkButton();
+      setSelected(chk.checked);
     };
+
     const label = el("div", { style: "flex:1" });
 
     const title = el("div", {
@@ -464,9 +550,20 @@ function renderGrid(items, folderNasLink){
       className: "view",
       textContent: "プレビュー"
     });
-    btnView.onclick = async () => {
+    btnView.onclick = async (ev) => {
+      ev.stopPropagation(); // カードクリックの選択トグルとは独立
       try {
-        // ★ すべて B2 presign-get で取得（NAS 分岐は削除）
+        // NAS の場合
+        if (item.storage === "nas" && item.nasUrl) {
+          openViewer(
+            item.title || "",
+            item.nasUrl,
+            isVideo(item.nasUrl || item.key)
+          );
+          return;
+        }
+
+        // B2 の presign-get
         const pres = await fetch(
           joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
           {
@@ -478,16 +575,8 @@ function renderGrid(items, folderNasLink){
             })
           }
         );
-    
-        if (!pres.ok) {
-          console.error("presign-get failed:", pres.status);
-          alert("プレビューURLの発行に失敗しました");
-          return;
-        }
-    
         const { url } = await pres.json();
         if (!url) throw new Error("empty url");
-    
         openViewer(item.title || "", url, isVideo(item.key));
       } catch (e) {
         console.error(e);
@@ -496,11 +585,13 @@ function renderGrid(items, folderNasLink){
     };
     actions.appendChild(btnView);
 
+    // タグ編集ボタン（後で管理者限定にする想定）
     const btnTag = el("button", {
       className: "btn",
       textContent: "タグ編集"
     });
-    btnTag.onclick = () => {
+    btnTag.onclick = (ev) => {
+      ev.stopPropagation();
       openTagEditor(item);
     };
     actions.appendChild(btnTag);
@@ -510,6 +601,24 @@ function renderGrid(items, folderNasLink){
     card.appendChild(chkWrap);
     card.appendChild(img);
     card.appendChild(meta);
+
+    // すでに選択状態なら見た目を同期
+    if (selectedKeys.has(item.key)) {
+      card.classList.add("selected");
+      chk.checked = true;
+    }
+
+    // カードクリックで選択トグル（選択モード中のみ）
+    card.addEventListener("click", (e) => {
+      if (!selectionMode) return;
+
+      // ボタンやチェック自体を押したときは無視
+      if (e.target.closest("button") || e.target.tagName === "INPUT") return;
+
+      const nowSelected = selectedKeys.has(item.key);
+      setSelected(!nowSelected);
+    });
+
     grid.appendChild(card);
   }
 }
@@ -532,7 +641,7 @@ async function renderFolder(manifestUrl){
   updateFolderHeader();   // ← 後で定義する関数
 
   const items = data.items || [];
-  const folderNasLink = data.folderNasLink || null;
+  currentItems = items;                                  // ← 追加：現フォルダのアイテムを覚えておく
 
   renderGrid(items, folderNasLink);
 }
@@ -542,8 +651,9 @@ function updateBulkButton() {
   const n = selectedKeys.size;
   const btn = document.getElementById("bulkDownload");
   if (!btn) return;
-  btn.textContent = `原本DL (${n})`;
-  btn.disabled = n === 0;
+  btn.textContent = `ダウンロード (${n})`;
+  // 選択モードで、かつ1件以上選ばれているときだけ有効
+  btn.disabled = !selectionMode || n === 0;
 }
 
 document.getElementById("bulkDownload")?.addEventListener("click", async () => {
@@ -599,7 +709,46 @@ document.getElementById("bulkDownload")?.addEventListener("click", async () => {
     finishZipDialog(false);
   }
 });
+/* ===== 選択モードのON/OFFとボタン状態更新 ===== */
+function setSelectionMode(on) {
+  selectionMode = !!on;
+  // bodyにクラスを付けてCSS制御
+  document.body.classList.toggle("select-mode", selectionMode);
 
+  // モードOFFにしたときは選択をクリア
+  if (!selectionMode) {
+    selectedKeys.clear();
+  }
+
+  // ボタン状態を更新
+  updateBulkButton();
+  updateSelectButtonsState();
+
+  // カードの見た目を再描画
+  renderGrid(currentItems, currentFolderNasLink);
+}
+
+function updateSelectButtonsState() {
+  const n = selectedKeys.size;
+  const btnToggle = document.getElementById("toggleSelectMode");
+  const btnAll    = document.getElementById("selectAll");
+  const btnClear  = document.getElementById("clearSelection");
+
+  if (btnToggle) {
+    btnToggle.textContent = selectionMode ? "選択モード終了" : "選択モード開始";
+  }
+
+  if (btnAll) {
+    // 選択モード中 && アイテムがあり && まだ全件選ばれていないときだけ有効
+    const allSelected = currentItems.length > 0 && n === currentItems.length;
+    btnAll.disabled = !selectionMode || currentItems.length === 0 || allSelected;
+  }
+
+  if (btnClear) {
+    // 選択モード中 && 何か選ばれているときだけ有効
+    btnClear.disabled = !selectionMode || n === 0;
+  }
+}
 /* ===== プレビュー用モーダル ===== */
 function openViewer(title, url, video=false){
   try{
@@ -854,7 +1003,31 @@ document.addEventListener("DOMContentLoaded", () => {
       await renderFolder(currentManifestUrl);
     }
   });
+  // ★ 選択モードボタン類
+  const btnToggleSelect = document.getElementById("toggleSelectMode");
+  const btnSelectAll    = document.getElementById("selectAll");
+  const btnClearSel     = document.getElementById("clearSelection");
 
+  btnToggleSelect?.addEventListener("click", () => {
+    setSelectionMode(!selectionMode);
+  });
+
+  btnSelectAll?.addEventListener("click", () => {
+    if (!selectionMode) return;
+    for (const item of currentItems) {
+      selectedKeys.add(item.key);
+    }
+    renderGrid(currentItems, currentFolderNasLink);
+  });
+
+  btnClearSel?.addEventListener("click", () => {
+    if (!selectionMode) return;
+    selectedKeys.clear();
+    renderGrid(currentItems, currentFolderNasLink);
+  });
+
+  // 初期状態のボタン表示
+  updateSelectButtonsState();
   loadFolderIndex();
 });
 </script>
