@@ -101,6 +101,11 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 #toggleSelectMode.btn-on:hover{
   filter:brightness(1.05);
 }
+.select-hint{
+  font-size:12px;
+  color:var(--muted);
+  margin:4px 0 10px;
+}
 /* カードが選択されているときの枠＆光り方 */
 .card.selected{
   border-color: var(--brand-d);
@@ -383,6 +388,50 @@ dialog#viewer::backdrop {
   font-size: 12px;
   color: var(--muted);
 }
+  /* タグ行：1列でボタンを置くだけ */
+.controls-tags {
+  margin-bottom: 10px;
+}
+
+.controls-tags .btn {
+  width: 100%;
+}
+
+/* 選択行：左にモード系、右にDLボタン */
+.controls-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.controls-select .controls-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls-select .controls-right {
+  margin-left: auto;
+}
+
+/* スマホでは DL ボタンを1行フル幅に落とす */
+@media (max-width: 768px) {
+  .controls-select {
+    flex-wrap: wrap;
+  }
+  .controls-select .controls-right {
+    width: 100%;
+  }
+  .controls-select .controls-right .btn {
+    width: 100%;
+  }
+}
+  button.btn[disabled] {
+  opacity: .4;
+  cursor: default;
+  box-shadow: none;
+}
 /* フッター */
 footer{
   color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
@@ -398,26 +447,31 @@ footer{
     <div id="folderHeader" class="folder-header"></div>
     </div>
     <div class="right">
-      <a id="toCatalog" class="btn ghost" href="#">アップロードへ</a>
+      <a id="toFolderList" class="btn ghost" href="#">フォルダ選択画面へ</a>
     </div>
   </header>
 
-    <div class="controls">
-    <select id="folderSelect"><option>読み込み中…</option></select>
-    <button id="toggleSelectMode" class="btn ghost">選択モード</button>
-    <button id="selectAll" class="btn ghost" disabled>全選択</button>
-    <button id="clearSelection" class="btn ghost" disabled>全解除</button>
-    <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
-  </div>
-
-  <div class="controls" id="tagControls">
-    <input
-      id="tagSearchInput"
-      type="text"
-      placeholder="タグ検索（例：発表 子どもの部）" />
-    <button id="tagSearchButton" class="btn ghost">検索</button>
-    <button id="tagSearchClear" class="btn ghost">解除</button>
-  </div>
+    <!-- タグ検索（あとで選択UIに差し替える前提で、今はとりあえずボタンだけ） -->
+    <div class="controls controls-tags">
+      <button id="tagFilterOpen" class="btn ghost" style="width:100%;">
+        タグで絞り込む
+      </button>
+    </div>
+    
+    <!-- 選択モード＋ダウンロードの行 -->
+    <div class="controls controls-select">
+      <div class="controls-left">
+        <button id="toggleSelectMode" class="btn ghost">選択モード OFF</button>
+        <button id="selectAll" class="btn ghost small" style="display:none;">全選択</button>
+        <button id="clearSelection" class="btn ghost small" style="display:none;">全解除</button>
+      </div>
+      <div class="controls-right">
+        <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
+      </div>
+      <div id="selectHint" class="select-hint">
+        写真を選択してダウンロードできます
+      </div>
+    </div>
 
   <div id="grid" class="grid"></div>
 
@@ -463,7 +517,8 @@ const CONFIG = {
   WORKER_ORIGIN: "https://taiko-worker-plain.fujizukadaiko.workers.dev",
   INDEX_URL: "https://taiko-worker-plain.fujizukadaiko.workers.dev/catalog/index",
   PRESIGN_EXPIRES: 300,
-  UPLOAD_URL: "https://fujizukadaiko.github.io/taiko-media-front-test/index.html"
+  UPLOAD_URL: "https://fujizukadaiko.github.io/taiko-media-front-test/index.html",
+  FOLDER_LIST_URL: "https://fujizukadaiko.github.io/taiko-media-front-test/folders.html" // トップ画面（フォルダ一覧）のURLに合わせて変更
 };
 
 /* ===== 便利関数 ===== */
@@ -504,36 +559,39 @@ async function loadFolderIndex(){
   const res = await fetch(CONFIG.INDEX_URL);
   console.log("[index] url=", CONFIG.INDEX_URL, "status=", res.status);
   if (!res.ok) throw new Error("index fetch failed");
-  const { folders=[] } = await res.json();
+  const { folders = [] } = await res.json();
 
+  if (!folders.length) return;
+
+  // もし将来また <select id="folderSelect"> を復活させたときのために、一応対応は残す
   const sel = document.getElementById("folderSelect");
-  if (!sel) return;
-  sel.innerHTML = "";
+  if (sel) {
+    sel.innerHTML = "";
+    for (const f of folders){
+      const manifestUrl = toWorkerUrl(f.manifest);
+      const opt = el("option", {
+        value: manifestUrl,
+        textContent: f.title ? `${f.date}｜${f.title}` : f.date
+      });
+      sel.appendChild(opt);
+    }
+  }
 
- for (const f of folders){
-  const manifestUrl = toWorkerUrl(f.manifest);
-
-  const opt = el("option", {
-    value: manifestUrl,
-    textContent: f.title ? `${f.date}｜${f.title}` : f.date
-  });
-  sel.appendChild(opt);
-}
-
-// ★ 初期選択も manifestUrl を使う
-if (folders.length){
+  // ★ 初期表示：1件目のフォルダを読み込む
   const firstManifest = toWorkerUrl(folders[0].manifest);
-  sel.value = firstManifest;
   currentManifestUrl = firstManifest;
-}
-if (currentManifestUrl) await renderFolder(currentManifestUrl);
+  await renderFolder(currentManifestUrl);
 
-  sel.onchange = async ()=>{
-    selectedKeys.clear();
-    updateBulkButton();
-    currentManifestUrl = sel.value;
-    await renderFolder(currentManifestUrl);
-  };
+  // セレクトがある環境なら onChange も設定
+  if (sel) {
+    sel.value = firstManifest;
+    sel.onchange = async () => {
+      selectedKeys.clear();
+      updateBulkButton();
+      currentManifestUrl = sel.value;
+      await renderFolder(currentManifestUrl);
+    };
+  }
 }
 
 /* ===== グリッド描画 共通関数 ===== */
@@ -829,6 +887,10 @@ function updateSelectButtonsState() {
   const btnToggle = document.getElementById("toggleSelectMode");
   const btnAll    = document.getElementById("selectAll");
   const btnClear  = document.getElementById("clearSelection");
+  const hint = document.getElementById("selectHint");
+  if (hint) {
+    hint.style.display = selectionMode ? "none" : "";
+  }
 
   if (btnToggle) {
   // ラベルを ON / OFF に変更
@@ -1078,10 +1140,10 @@ function updateFolderHeader(){
 }
 /* ===== 起動 ===== */
 document.addEventListener("DOMContentLoaded", () => {
-  const a = document.getElementById("toCatalog");
-  if (a && CONFIG.UPLOAD_URL) {
-    a.href = CONFIG.UPLOAD_URL;
-    a.target = "_self";
+  const linkFolderList = document.getElementById("toFolderList");
+  if (linkFolderList && CONFIG.FOLDER_LIST_URL) {
+    linkFolderList.href = CONFIG.FOLDER_LIST_URL;
+    linkFolderList.target = "_self";
   }
 
   const input = $("#tagSearchInput");
