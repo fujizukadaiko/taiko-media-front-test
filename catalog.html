@@ -340,32 +340,6 @@ dialog#viewer::backdrop {
     max-height: 75vh;
   }
 }
-  /* サムネを2列にする */
-  .grid{
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  /* ちょっとだけコンパクトに */
-  .card{
-    border-radius:12px;
-  }
-  .meta{
-    padding:8px 10px;
-  }
-  .title{
-    font-size:11px;
-  }
-}
-.folder-header{
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display:block;
-  max-width:100%;   /* brand 内でちゃんと折り畳まれる */
-}
   /* ==== ZIP作成ダイアログ ==== */
 #zipDialog {
   border: none;
@@ -864,14 +838,16 @@ function updateSelectButtonsState() {
 }
 
   if (btnAll) {
-    // 選択モード中 && アイテムがあり && まだ全件選ばれていないときだけ有効
     const allSelected = currentItems.length > 0 && n === currentItems.length;
     btnAll.disabled = !selectionMode || currentItems.length === 0 || allSelected;
+    // 選択モードじゃないときはボタン自体を隠す
+    btnAll.style.display = selectionMode ? "" : "none";
   }
-
+  
   if (btnClear) {
-    // 選択モード中 && 何か選ばれているときだけ有効
     btnClear.disabled = !selectionMode || n === 0;
+    // こちらも選択モードのときだけ表示
+    btnClear.style.display = selectionMode ? "" : "none";
   }
 }
 /* ===== プレビュー用モーダル ===== */
