@@ -478,62 +478,67 @@ async function renderFolder(manifestUrl){
   renderGrid(items, folderNasLink);
 }
   
-/* ===== 原本DL(複数) ===== */
+/* ===== 原本DL(複数) → ZIP DL に変更 ===== */
 function updateBulkButton() {
   const n = selectedKeys.size;
-
-  // jQuery を使うより、素直に DOM 取っちゃった方が安全
   const btn = document.getElementById("bulkDownload");
   if (!btn) return;
-
   btn.textContent = `原本DL (${n})`;
   btn.disabled = n === 0;
 }
-function triggerDownload(url) {
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.src = url;   // ← ここに presign-get でもらったURLを直で入れるだけ
-  document.body.appendChild(iframe);
 
-  // メモリリーク防止で、しばらくしたら掃除
-  setTimeout(() => {
-    iframe.remove();
-  }, 60 * 1000);
-}
 document.getElementById("bulkDownload")?.addEventListener("click", async () => {
   if (selectedKeys.size === 0) return;
 
   const keys = Array.from(selectedKeys);
+  const btn = document.getElementById("bulkDownload");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "ZIP 準備中…";
 
-  for (const key of keys) {
-    try {
-      const pres = await fetch(
-        joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            key,
-            expires: CONFIG.PRESIGN_EXPIRES,
-            attachment: true,
-          }),
-        }
-      );
-
-      if (!pres.ok) {
-        console.error("presign-get failed:", pres.status);
-        continue;
-      }
-
-      const { url } = await pres.json();
-      if (url) {
-        triggerDownload(url);
-      }
-
-      await new Promise((r) => setTimeout(r, 400));
-    } catch (e) {
-      console.error(e);
+  try {
+    // ZIP ファイル名：とりあえず日付ベースに（ASCII だけにしておく）
+    let baseName = "media";
+    if (currentFolderMeta && currentFolderMeta.date) {
+      baseName = currentFolderMeta.date; // 例: 20251102
     }
+    const zipName = `${baseName}.zip`;
+
+    const res = await fetch(
+      joinPath(CONFIG.WORKER_ORIGIN, "/files/zip"),
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          keys,
+          name: zipName,   // Worker 側で Content-Disposition に使う用
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      console.error("zip failed:", res.status);
+      alert("ZIP の作成に失敗しました");
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = zipName;   // ダウンロードファイル名（クライアント側）
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error(e);
+    alert("ZIP ダウンロード中にエラーが発生しました");
+  } finally {
+    // ボタンの表示を元に戻す（選択数が変わっている可能性もあるので再計算）
+    btn.disabled = selectedKeys.size === 0;
+    btn.textContent = originalLabel;
   }
 });
 
