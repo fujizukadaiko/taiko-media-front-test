@@ -57,8 +57,12 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 
 /* ── フィルタ行 ── */
 .controls{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:10px; margin:0 0 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:0 0 18px;
+  flex-wrap:wrap;          /* ★ ボタンが下の行に逃げられるように */
 }
 .controls select{
   flex:1;
@@ -67,6 +71,12 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   border-radius:10px;
   background:#fff; color:var(--text);
   font-size:15px;
+
+  min-width:0;              /* ★ これがないと縮まってくれない */
+  max-width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;   /* ★ 長いとき「…」で省略 */
 }
 .controls button.btn{
   white-space:nowrap;
@@ -173,8 +183,21 @@ body.select-mode .card button{
   border:1px solid var(--border);
   padding:4px 8px;border-radius:999px;
 }
-.actions{display:flex;gap:8px;margin-top:10px;}
-.actions button{flex:1;text-align:center;font-size:13px;padding:10px 12px;border-radius:12px;}
+/* ボタンを常に縦2段にする */
+.actions{
+  display:flex;
+  flex-direction:column;   /* ★ 縦並び */
+  gap:6px;
+  margin-top:10px;
+}
+
+.actions button{
+  width:100%;              /* ★ カード幅いっぱい */
+  text-align:center;
+  font-size:13px;
+  padding:10px 12px;
+  border-radius:12px;
+}
 .view{background:var(--chip);color:var(--text);border:1px solid var(--border);}
 
   /* ==== プレビュー用モーダル調整 ==== */
@@ -255,6 +278,22 @@ dialog#viewer::backdrop {
   #v-container img,
   #v-container video {
     max-height: 75vh;
+  }
+}
+  /* サムネを2列にする */
+  .grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* ちょっとだけコンパクトに */
+  .card{
+    border-radius:12px;
+  }
+  .meta{
+    padding:8px 10px;
+  }
+  .title{
+    font-size:11px;
   }
 }
 .folder-header{
