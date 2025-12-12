@@ -490,14 +490,15 @@ function updateBulkButton() {
   btn.disabled = n === 0;
 }
 function triggerDownload(url) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.target = "_blank";   // なくてもOKだがあっても良い
-  a.rel = "noopener";
-  a.download = "";       // filename は header 側の Content-Disposition を優先
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = url;   // ← ここに presign-get でもらったURLを直で入れるだけ
+  document.body.appendChild(iframe);
+
+  // メモリリーク防止で、しばらくしたら掃除
+  setTimeout(() => {
+    iframe.remove();
+  }, 60 * 1000);
 }
 document.getElementById("bulkDownload")?.addEventListener("click", async () => {
   if (selectedKeys.size === 0) return;
