@@ -397,25 +397,50 @@ dialog#viewer::backdrop {
   width: 100%;
 }
 
-/* 選択行：左に DL ボタン、そのすぐ右にモード系ボタンを並べる */
+/* 選択行：左に DL ボタン、その右に選択モードボタン */
 .controls-select {
   display:flex;
   align-items:center;
-  flex-wrap:wrap;          /* 幅が足りなければ次の行に折り返す */
+  flex-wrap:wrap;
   gap:8px;
-  justify-content:flex-start;  /* ★ 左寄せ */
+  justify-content:flex-start; /* 左寄せ */
 }
-
 .controls-select .controls-left,
-.controls-select .controls-right {
+.controls-select .controls-right{
   display:flex;
   align-items:center;
   gap:8px;
 }
 
-/* スマホでも「左寄せ＆必要なら折り返し」のまま */
+/* 3段目：ヒント or 全選択/全解除 */
+.select-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin:4px 0 12px;
+}
+.select-hint{
+  font-size:12px;
+  color:var(--muted);
+  margin:0;
+}
+.select-actions{
+  display:none;          /* 選択モードONで flex に切り替え */
+  gap:8px;
+}
+.select-actions .btn,
+button.btn.small{
+  font-size:12px;
+  padding:6px 10px;
+}
+
+/* スマホでは折り返しOK */
 @media (max-width: 768px) {
-  .controls-select {
+  .controls-select{
+    flex-wrap:wrap;
+  }
+  .select-row{
     flex-wrap:wrap;
   }
 }
@@ -507,23 +532,26 @@ footer{
       </button>
     </div>
     
-      <!-- 選択モード＋ダウンロードの行 -->
+  <!-- 選択モード＋ダウンロードの行 -->
+  <!-- 2段目：左にDL、右に選択モード -->
   <div class="controls controls-select">
-    <!-- 左：ダウンロードボタン -->
     <div class="controls-left">
       <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
     </div>
-    <!-- 右：選択モード＋全選択・全解除 -->
     <div class="controls-right">
       <button id="toggleSelectMode" class="btn ghost">選択モード OFF</button>
-      <button id="selectAll" class="btn ghost small" style="display:none;">全選択</button>
-      <button id="clearSelection" class="btn ghost small" style="display:none;">全解除</button>
     </div>
   </div>
-
-  <!-- 3段目：ヒント文 -->
-  <div id="selectHint" class="select-hint">
-    写真を選択してダウンロードできます
+  
+  <!-- 3段目：ヒント or 全選択 / 全解除 -->
+  <div class="select-row">
+    <p id="selectHint" class="select-hint">
+      写真を選択してダウンロードできます
+    </p>
+    <div id="selectActions" class="select-actions">
+      <button id="selectAll" class="btn ghost small">全選択</button>
+      <button id="clearSelection" class="btn ghost small">全解除</button>
+    </div>
   </div>
 
   <div id="grid" class="grid"></div>
