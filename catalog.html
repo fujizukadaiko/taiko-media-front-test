@@ -397,37 +397,26 @@ dialog#viewer::backdrop {
   width: 100%;
 }
 
-/* 選択行：左にモード系、右にDLボタン */
-/* 選択行：左にDLボタン、右にモード系ボタン */
+/* 選択行：左に DL ボタン、そのすぐ右にモード系ボタンを並べる */
 .controls-select {
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:10px;
+  flex-wrap:wrap;          /* 幅が足りなければ次の行に折り返す */
+  gap:8px;
+  justify-content:flex-start;  /* ★ 左寄せ */
 }
 
-.controls-select .controls-left {
-  display:flex;
-  align-items:center;
-}
-
+.controls-select .controls-left,
 .controls-select .controls-right {
   display:flex;
   align-items:center;
   gap:8px;
-  margin-left:auto;
 }
 
-/* スマホでは 1 行目に DL（フル幅）、2 行目にモード系 */
+/* スマホでも「左寄せ＆必要なら折り返し」のまま */
 @media (max-width: 768px) {
   .controls-select {
     flex-wrap:wrap;
-  }
-  .controls-select .controls-left {
-    width:100%;
-  }
-  .controls-select .controls-left .btn {
-    width:100%;     /* DLボタンを1行フル幅に */
   }
 }
   button.btn[disabled] {
