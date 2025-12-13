@@ -515,7 +515,43 @@ dialog#tagDialog::backdrop {
 .view.view-active{
   display:block;
 }
-  
+  /* ── フォルダ選択画面の一覧 ── */
+.folder-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:12px;
+  margin-top:12px;
+}
+
+.folder-card{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:var(--panel);
+  box-shadow:0 3px 12px rgba(0,0,0,.04);
+  cursor:pointer;
+  text-align:left;
+}
+
+.folder-card-title{
+  font-size:14px;
+  font-weight:600;
+  margin-bottom:4px;
+}
+
+.folder-card-sub{
+  font-size:12px;
+  color:var(--muted);
+}
+
+@media (max-width: 768px){
+  .folder-list{
+    grid-template-columns:repeat(1,minmax(0,1fr));
+  }
+}
 /* フッター */
 footer{
   color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
@@ -528,13 +564,19 @@ footer{
 
     <!-- ▼▼ フォルダ選択ビュー ▼▼ -->
     <section id="view-folder-list" class="view view-active">
-      <!-- ここは後で実装。今は仮のヘッダだけ置いといてOK -->
       <header class="topbar">
         <div class="brand">
-          <h1>フォルダ選択</h1>
+          <h1>カタログ</h1>
           <div class="folder-header">見たいイベントのフォルダを選んでください</div>
         </div>
+        <div class="right">
+          <a href="#" id="toUploadFromList" class="btn">アップロードへ</a>
+        </div>
       </header>
+    
+      <!-- フォルダ一覧カード -->
+      <div id="folderList" class="folder-list"></div>
+    </section>
 
       <!-- ここにフォルダ一覧カードをあとで作る -->
       <div id="folderList"></div>
@@ -700,7 +742,7 @@ function switchView(targetId){
   });
 }
   
-/* ===== フォルダ一覧読み込み → セレクタへ反映 ===== */
+/* ===== フォルダ一覧読み込み → フォルダ選択画面に表示 ===== */
 async function loadFolderIndex(){
   const res = await fetch(CONFIG.INDEX_URL);
   console.log("[index] url=", CONFIG.INDEX_URL, "status=", res.status);
@@ -709,35 +751,59 @@ async function loadFolderIndex(){
 
   if (!folders.length) return;
 
-  // もし将来また <select id="folderSelect"> を復活させたときのために、一応対応は残す
-  const sel = document.getElementById("folderSelect");
-  if (sel) {
-    sel.innerHTML = "";
+  const listEl = document.getElementById("folderList");
+  if (listEl) {
+    listEl.innerHTML = "";
+
     for (const f of folders){
       const manifestUrl = toWorkerUrl(f.manifest);
-      const opt = el("option", {
-        value: manifestUrl,
-        textContent: f.title ? `${f.date}｜${f.title}` : f.date
+
+      const card = el("button", {
+        type: "button",
+        className: "folder-card"
       });
-      sel.appendChild(opt);
+
+      // タイトル行（イベント名）
+      const titleText = f.title || "無題のイベント";
+      const line1 = el("div", {
+        className: "folder-card-title",
+        textContent: titleText
+      });
+
+      // サブ行（日付＋場所）
+      const dateLabel = formatDateJp(f.date || "");
+      const subParts = [];
+      if (dateLabel) subParts.push(dateLabel);
+      if (f.place)   subParts.push(f.place);
+
+      const line2 = el("div", {
+        className: "folder-card-sub",
+        textContent: subParts.join(" ｜ ")
+      });
+
+      card.appendChild(line1);
+      card.appendChild(line2);
+
+      // クリックしたら：
+      // 1) このフォルダの manifest をロード
+      // 2) カタログビューに切り替え
+      card.addEventListener("click", async () => {
+        selectedKeys.clear();
+        setSelectionMode(false);      // 選択モードもOFFにしておく
+        currentManifestUrl = manifestUrl;
+        await renderFolder(currentManifestUrl);
+        switchView("view-catalog");
+      });
+
+      listEl.appendChild(card);
     }
   }
 
-  // ★ 初期表示：1件目のフォルダを読み込む
+  // 初期状態として、いちおう先頭フォルダを読み込んでおく（
+  // 「フォルダ選択 → すぐ戻る」時に中身が空にならないように）
   const firstManifest = toWorkerUrl(folders[0].manifest);
   currentManifestUrl = firstManifest;
   await renderFolder(currentManifestUrl);
-
-  // セレクトがある環境なら onChange も設定
-  if (sel) {
-    sel.value = firstManifest;
-    sel.onchange = async () => {
-      selectedKeys.clear();
-      updateBulkButton();
-      currentManifestUrl = sel.value;
-      await renderFolder(currentManifestUrl);
-    };
-  }
 }
 
 /* ===== グリッド描画 共通関数 ===== */
@@ -1336,6 +1402,21 @@ document.addEventListener("DOMContentLoaded", () => {
   // ▼ フォルダ選択画面へ：view 切り替え
   document.getElementById("toFolderList")?.addEventListener("click", () => {
     switchView("view-folder-list");
+  });
+    // アップロードへボタン（フォルダ選択画面）
+  document.getElementById("toUploadFromList")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (CONFIG.UPLOAD_URL) {
+      location.href = CONFIG.UPLOAD_URL;
+    }
+  });
+
+  // アップロードへボタン（カタログ画面）
+  document.getElementById("toUploadFromCatalog")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (CONFIG.UPLOAD_URL) {
+      location.href = CONFIG.UPLOAD_URL;
+    }
   });
 
     const input = $("#tagSearchInput");
