@@ -112,40 +112,8 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   box-shadow: 0 0 0 2px rgba(161, 212, 221, 0.7);
 }
 
-/* チェックボックスを丸く・大きめにする */
-.card-check{
-  width: 20px;
-  height: 20px;
-  appearance: none;
-  -webkit-appearance: none;
-  border-radius: 999px;
-  border: 2px solid var(--border);
-  background: #fff;
-  position: relative;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: border-color .15s, background-color .15s;
-}
-
-.card-check::after{
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border-radius: 999px;
-  background: var(--brand);
-  opacity: 0;
-  transition: opacity .15s;
-}
-
-.card-check:checked{
-  border-color: var(--brand-d);
-  background: #f0faf4;
-}
-
-.card-check:checked::after{
-  opacity: 1;
-}
-  
+ 
+/* カード全体 */
 .card{
   position:relative;
   display:flex;
@@ -157,18 +125,16 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   box-shadow:0 4px 18px rgba(0,0,0,.06);
   transition: box-shadow .18s ease-out, transform .18s ease-out, border-color .18s ease-out;
 }
-
 .card:hover{
   transform:translateY(-1px);
   box-shadow:0 8px 22px rgba(0,0,0,.09);
 }
-
-/* サムネ用ラッパ */
-.thumb-wrap{
-  position:relative;
-  overflow:hidden;
-  border-top-left-radius:16px;
-  border-top-right-radius:16px;
+/* カードの一番上の行（種別＋選択中） */
+.card-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 12px 4px;
 }
 
 /* サムネ本体 */
@@ -184,32 +150,24 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
 .card:hover .thumb{
   transform:scale(1.02);
 }
-  /* サムネ左上の種類バッジ (image / video) */
+  /* 種別バッジ (image / video) */
 .thumb-kind-badge{
-  position:absolute;
-  left:8px;
-  top:8px;
   padding:3px 8px;
   font-size:10px;
   border-radius:999px;
   background:rgba(255,255,255,0.94);
   border:1px solid rgba(0,0,0,0.05);
 }
-
 .thumb-kind-badge.is-video{
   color:#2d5560;
   background:rgba(238,248,251,0.98);
 }
-
 .thumb-kind-badge.is-image{
   color:#47644a;
   background:rgba(242,247,241,0.98);
 }
-  /* サムネ右上の「選択中」ピル */
+/* 右側の「選択中」ピル */
 .card-select-pill{
-  position:absolute;
-  right:8px;
-  top:8px;
   padding:3px 8px;
   font-size:10px;
   border-radius:999px;
@@ -218,8 +176,6 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   border:1px solid rgba(0,0,0,0.05);
   display:none;
 }
-
-/* .card.selected のときだけ表示 */
 .card.selected .card-select-pill{
   display:inline-flex;
   align-items:center;
@@ -229,24 +185,49 @@ a.btn:disabled,button.btn:disabled{opacity:.6;cursor:not-allowed;}
   content:"✓";
   font-size:10px;
 }
-  /* サムネ下のタグ行：「#タグ1 #タグ2」形式 */
+  /* サムネ用ラッパ＋画像本体 */
+.thumb-wrap{
+  overflow:hidden;
+}
+.thumb{
+  width:100%;
+  aspect-ratio:4/3;
+  object-fit:cover;
+  background:#f2f6ee;
+  display:block;
+  transition:transform .22s ease-out;
+}
+.card:hover .thumb{
+  transform:scale(1.02);
+}
+/* サムネの下：タグ＋ボタン */
+.meta{
+  padding:10px 12px 12px;
+}
 .tag-line{
   font-size:11px;
-  color:#345c34;      /* 濃いめの緑 */
+  color:#345c34;
   margin-bottom:8px;
-  min-height:1.2em;   /* タグが無いときもレイアウトが揺れない程度に */
+  min-height:1.2em;
   word-break:break-word;
 }
-/* 選択モードじゃないときはチェックを薄く＆操作不可にする */
-body:not(.select-mode) .card-check{
-  opacity: 0;
-  pointer-events: none;
+.actions{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-top:4px;
 }
-
-/* 選択モードのときは見えるように */
-body.select-mode .card-check{
-  opacity: 1;
-  pointer-events: auto;
+.actions button{
+  width:100%;
+  text-align:center;
+  font-size:13px;
+  padding:10px 12px;
+  border-radius:12px;
+}
+.view{
+  background:var(--chip);
+  color:var(--text);
+  border:1px solid var(--border);
 }
 
 /* カード全体が選択可能っぽく見えるように（選択モード中のみ） */
@@ -945,13 +926,13 @@ function renderFolderList(folders) {
     listEl.appendChild(row);
   });
 }
+/* ===== グリッド描画 共通関数 ===== */
 function renderGrid(items, folderNasLink){
   // 状態を更新
   currentItems = items || [];
   const grid = $("#grid");
   grid.innerHTML = "";
 
-  // 選択状態は一旦リセットしない（モードOFFでclear済み）
   updateBulkButton();
   updateSelectButtonsState();
 
@@ -972,105 +953,91 @@ function renderGrid(items, folderNasLink){
 
   for (const item of currentItems){
     const card = el("div", { className: "card" });
+    const kind = isVideo(item.key) ? "video" : "image";
 
-    // このカードの選択状態をまとめて更新する関数
+    // このカードの選択状態
+    let isSelected = selectedKeys.has(item.key);
+
     const setSelected = (on) => {
-      if (on) {
+      isSelected = !!on;
+      if (isSelected) {
         selectedKeys.add(item.key);
       } else {
         selectedKeys.delete(item.key);
       }
-      chk.checked = on;
-      card.classList.toggle("selected", on);
+      card.classList.toggle("selected", isSelected);
       updateBulkButton();
       updateSelectButtonsState();
     };
 
-    // 上部：チェックボックス行（タイトルは表示しない）
-    const chkWrap = el("div", {
-      style: "display:flex;align-items:center;gap:8px;padding:10px 12px"
-    });
-    const chk = el("input", {
-      type: "checkbox",
-      className: "card-check"
-    });
+    // ── 上部ヘッダ（種別バッジ + 選択中ピル） ──
+    const header = el("div", { className: "card-header" });
 
-    chk.onchange = () => {
-      setSelected(chk.checked);
-    };
-
-    const spacer = el("div", { style: "flex:1" });
-    chkWrap.appendChild(chk);
-    chkWrap.appendChild(spacer);
-
-    card.appendChild(chkWrap);
-
-    // 中央：サムネ（＋左上種類バッジ＋右上選択中ピル）
-    const thumbWrap = el("div", { className: "thumb-wrap" });
-
-    const img = el("img", {
-      className: "thumb",
-      alt: ""
-    });
-    img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
-
-    const kind = isVideo(item.key) ? "video" : "image";
-
-    // 左上 種類バッジ
     const kindBadge = el("span", {
-      className: "thumb-kind-badge " + (kind === "video" ? "is-video" : "is-image"),
+      className:
+        "thumb-kind-badge " +
+        (kind === "video" ? "is-video" : "is-image"),
       textContent: kind
     });
 
-    // 右上 選択中ピル
     const selectPill = el("span", {
       className: "card-select-pill",
       textContent: "選択中"
     });
 
-    thumbWrap.appendChild(img);
-    thumbWrap.appendChild(kindBadge);
-    thumbWrap.appendChild(selectPill);
+    header.appendChild(kindBadge);
+    header.appendChild(selectPill);
+    card.appendChild(header);
 
+    // ── サムネイル ──
+    const thumbWrap = el("div", { className: "thumb-wrap" });
+    const img = el("img", {
+      className: "thumb",
+      alt: item.title || ""
+    });
+    img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+    thumbWrap.appendChild(img);
     card.appendChild(thumbWrap);
 
-    // 下部：タグ行 + プレビューボタン
+    // ── タグ行 (#タグ1 #タグ2 …) ──
     const meta = el("div", { className: "meta" });
 
-    // タグ行：「#タグ1 #タグ2」形式
-    const tagLine = el("div", { className: "tag-line" });
-    if (Array.isArray(item.tags) && item.tags.length > 0) {
-      tagLine.textContent = item.tags
-        .map(t => t && t.trim())
-        .filter(Boolean)
-        .map(t => `#${t}`)
-        .join(" ");
-    } else {
-      tagLine.textContent = ""; // タグなしなら何も表示しない
-    }
-    meta.appendChild(tagLine);
+    const tagLineText =
+      Array.isArray(item.tags) && item.tags.length
+        ? item.tags.map((t) => `#${t}`).join(" ")
+        : "";
 
-    // プレビューボタンのみ
-    const actions = el("div", { className: "actions" });
-    const btnView = el("button", {
-      className: "view",
-      textContent: "プレビュー"
+    const tagLine = el("div", {
+      className: "tag-line",
+      textContent: tagLineText
     });
 
-    btnView.onclick = async (ev) => {
-      ev.stopPropagation(); // カードクリックの選択トグルとは独立
+    meta.appendChild(tagLine);
+    card.appendChild(meta);
+
+    // 初期の選択状態を反映
+    if (isSelected) {
+      card.classList.add("selected");
+    }
+
+    // ── 画像クリック：通常時はプレビュー、選択モード中は選択トグル ──
+    img.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // 選択モード中 → プレビューは出さず、選択トグル
+      if (selectionMode) {
+        setSelected(!isSelected);
+        return;
+      }
+
+      // 通常モード → プレビューを開く（タイトルは空）
       try {
-        // NAS の場合
         if (item.storage === "nas" && item.nasUrl) {
-          openViewer(
-            item.title || "",
-            item.nasUrl,
-            isVideo(item.nasUrl || item.key)
-          );
+          openViewer("", item.nasUrl, isVideo(item.nasUrl || item.key));
           return;
         }
 
-        // B2 の presign-get
         const pres = await fetch(
           joinPath(CONFIG.WORKER_ORIGIN, "/files/presign-get"),
           {
@@ -1084,32 +1051,17 @@ function renderGrid(items, folderNasLink){
         );
         const { url } = await pres.json();
         if (!url) throw new Error("empty url");
-        openViewer(item.title || "", url, isVideo(item.key));
+        openViewer("", url, isVideo(item.key));
       } catch (e) {
         console.error(e);
         alert("プレビューURLの発行に失敗しました");
       }
-    };
-    actions.appendChild(btnView);
-    meta.appendChild(actions);
+    });
 
-    card.appendChild(meta);
-
-    // すでに選択状態なら見た目を同期
-    if (selectedKeys.has(item.key)) {
-      card.classList.add("selected");
-      chk.checked = true;
-    }
-
-    // カードクリックで選択トグル（選択モード中のみ）
+    // ── カード全体クリック（選択モードのときだけ有効） ──
     card.addEventListener("click", (e) => {
       if (!selectionMode) return;
-
-      // ボタンやチェック自体を押したときは無視
-      if (e.target.closest("button") || e.target.tagName === "INPUT") return;
-
-      const nowSelected = selectedKeys.has(item.key);
-      setSelected(!nowSelected);
+      setSelected(!isSelected);
     });
 
     grid.appendChild(card);
@@ -1296,7 +1248,11 @@ function updateSelectButtonsState() {
 function openViewer(title, url, video=false){
   try{
     const dlg = document.getElementById("viewer");
-    document.getElementById("v-title").textContent = title;
+
+    // ★ タイトルは常に空にする（画像だけ表示）
+    const titleEl = document.getElementById("v-title");
+    if (titleEl) titleEl.textContent = "";
+
     const box = document.getElementById("v-container");
     box.innerHTML = "";
     if (video){
@@ -1304,7 +1260,7 @@ function openViewer(title, url, video=false){
       v.src = url;
       box.appendChild(v);
     } else {
-      const img = el("img", { className:"modal-img", alt:title });
+      const img = el("img", { className:"modal-img", alt:"" });
       img.src = url;
       box.appendChild(img);
     }
