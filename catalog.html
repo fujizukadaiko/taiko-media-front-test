@@ -1076,9 +1076,12 @@ async function loadAllItems() {
       return;
     }
 
-    // manifest ではなく search なので renderGrid 直でOK
-    currentItems = js.items || [];
-    currentFolderNasLink = null; // ALLはNASリンクなし想定
+    // ★ ここがポイント：ALL でも originalItems を更新する
+    originalItems      = js.items || [];  // タグ集計・絞り込みの元データ
+    currentItems       = originalItems;   // いま画面に出すリスト
+    selectedTagFilters = [];              // タグ選択状態リセット
+    currentFolderNasLink = null;          // ALL は NAS リンクなし想定
+
     renderGrid(currentItems, null);
   } catch (e) {
     console.error(e);
@@ -1454,17 +1457,18 @@ function formatDateJp(dateStr){
 }
 
 // 上部サブタイトルの描画
-function updateFolderHeader(){
+function updateFolderHeader() {
   const elHeader = document.getElementById("folderHeader");
   if (!elHeader) return;
 
-  if (!currentFolderMeta.date){
-    elHeader.textContent = "";
-    return;
+  const parts = [];
+
+  // 日付があるときだけ日付を入れる
+  if (currentFolderMeta.date) {
+    parts.push(formatDateJp(currentFolderMeta.date));
   }
 
-  const parts = [];
-  parts.push(formatDateJp(currentFolderMeta.date));
+  // タイトル（イベント名 or "すべての写真"）があれば入れる
   if (currentFolderMeta.title) {
     parts.push(currentFolderMeta.title);
   }
