@@ -515,42 +515,35 @@ dialog#tagDialog::backdrop {
 .view.view-active{
   display:block;
 }
-  /* ── フォルダ選択画面の一覧 ── */
+/* ── フォルダ選択画面の一覧（シンプルなリスト） ── */
 .folder-list{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
-  gap:12px;
   margin-top:12px;
+  border-top:1px solid var(--border);
 }
 
-.folder-card{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  padding:10px 12px;
-  border-radius:14px;
-  border:1px solid var(--border);
-  background:var(--panel);
-  box-shadow:0 3px 12px rgba(0,0,0,.04);
-  cursor:pointer;
+.folder-item{
+  width:100%;
+  padding:10px 4px;
+  border:none;
+  border-bottom:1px solid var(--border);
+  background:transparent;
   text-align:left;
+  cursor:pointer;
+  display:block;
 }
 
-.folder-card-title{
-  font-size:14px;
-  font-weight:600;
-  margin-bottom:4px;
-}
-
-.folder-card-sub{
+.folder-item-date{
   font-size:12px;
   color:var(--muted);
+  margin-bottom:2px;
 }
 
-@media (max-width: 768px){
-  .folder-list{
-    grid-template-columns:repeat(1,minmax(0,1fr));
-  }
+.folder-item-title{
+  font-size:14px;
+  font-weight:600;
+  line-height:1.6;
+  color:var(--text);
+  word-break:break-word;   /* 画面幅からはみ出るとき折り返し */
 }
 /* フッター */
 footer{
@@ -755,49 +748,44 @@ async function loadFolderIndex(){
   if (listEl) {
     listEl.innerHTML = "";
 
-    for (const f of folders){
-      const manifestUrl = toWorkerUrl(f.manifest);
-
-      const card = el("button", {
-        type: "button",
-        className: "folder-card"
-      });
-
-      // タイトル行（イベント名）
-      const titleText = f.title || "無題のイベント";
-      const line1 = el("div", {
-        className: "folder-card-title",
-        textContent: titleText
-      });
-
-      // サブ行（日付＋場所）
-      const dateLabel = formatDateJp(f.date || "");
-      const subParts = [];
-      if (dateLabel) subParts.push(dateLabel);
-      if (f.place)   subParts.push(f.place);
-
-      const line2 = el("div", {
-        className: "folder-card-sub",
-        textContent: subParts.join(" ｜ ")
-      });
-
-      card.appendChild(line1);
-      card.appendChild(line2);
-
-      // クリックしたら：
-      // 1) このフォルダの manifest をロード
-      // 2) カタログビューに切り替え
-      card.addEventListener("click", async () => {
-        selectedKeys.clear();
-        setSelectionMode(false);      // 選択モードもOFFにしておく
-        currentManifestUrl = manifestUrl;
-        await renderFolder(currentManifestUrl);
-        switchView("view-catalog");
-      });
-
-      listEl.appendChild(card);
-    }
-  }
+      for (const f of folders){
+        const manifestUrl = toWorkerUrl(f.manifest);
+    
+        // ボタン本体（リストの1行）
+        const row = el("button", {
+          type: "button",
+          className: "folder-item"
+        });
+    
+        // 1行目：日付
+        const dateLabel = formatDateJp(f.date || "");
+        const lineDate = el("div", {
+          className: "folder-item-date",
+          textContent: dateLabel || "日付未設定"
+        });
+    
+        // 2行目：イベント名（複数のときは、で区切ったタイトル文字列そのまま）
+        const titleText = f.title || "無題のイベント";
+        const lineTitle = el("div", {
+          className: "folder-item-title",
+          textContent: titleText
+        });
+    
+        row.appendChild(lineDate);
+        row.appendChild(lineTitle);
+    
+        // クリックしたらそのフォルダを読み込み → カタログビューへ
+        row.addEventListener("click", async () => {
+          selectedKeys.clear();
+          setSelectionMode(false);
+          currentManifestUrl = manifestUrl;
+          await renderFolder(currentManifestUrl);
+          switchView("view-catalog");
+        });
+    
+        listEl.appendChild(row);
+      }
+      }
 
   // 初期状態として、いちおう先頭フォルダを読み込んでおく（
   // 「フォルダ選択 → すぐ戻る」時に中身が空にならないように）
