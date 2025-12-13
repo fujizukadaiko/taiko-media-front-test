@@ -515,15 +515,20 @@ dialog#tagDialog::backdrop {
 .view.view-active{
   display:block;
 }
-/* ── フォルダ選択画面の一覧（シンプルなリスト＋インセット線） ── */
+/* ── フォルダ選択画面の一覧：白いカード＋インセット線 ── */
 .folder-list{
   margin-top:12px;
+  background:#ffffff;
+  border-radius:16px;
+  border:1px solid var(--border);
+  box-shadow:0 4px 18px rgba(0,0,0,.04);
+  padding:4px 0;       /* 上下ちょっと余白 */
 }
 
 /* 1件分（ボタン） */
 .folder-item{
   width:100%;
-  padding:10px 0;
+  padding:10px 16px;   /* カードの内側に少し余白 */
   background:transparent;
   border:none;
   text-align:left;
@@ -536,8 +541,8 @@ dialog#tagDialog::backdrop {
 .folder-item::after{
   content:"";
   position:absolute;
-  left:12px;           /* ここを変えると線の左右の“空き”が変わる */
-  right:12px;
+  left:16px;           /* 線の左右の“空き” */
+  right:16px;
   bottom:0;
   border-bottom:1px solid var(--border);
 }
@@ -554,21 +559,22 @@ dialog#tagDialog::backdrop {
   margin-bottom:2px;
 }
 
-/* 2行目：タイトル（複数イベントを「、」区切りでそのまま表示） */
+/* 2行目：タイトル */
 .folder-item-title{
   font-size:14px;
   font-weight:600;
   line-height:1.6;
   color:var(--text);
-  word-break:break-word;   /*長いとき折り返し*/
+  word-break:break-word;   /* 長いとき折り返し */
 }
 
-  /* フォルダ選択ビュー自体は枠なし＆背景なしにする */
-#view-folder-list{
+ /* フォルダ選択ビュー／カタログビュー自体は枠なし＆背景なしにする */
+#view-folder-list,
+#view-catalog{
   background: transparent;
   border: none;
   box-shadow: none;
-  padding: 0;          /* ここは好みで調整可 */
+  padding: 0;
 }
   
 /* フッター */
