@@ -507,6 +507,15 @@ dialog#tagDialog::backdrop {
   gap:8px;
   margin-top:4px;
 }
+  
+/* 画面切り替え用 */
+.view{
+  display:none;
+}
+.view.view-active{
+  display:block;
+}
+  
 /* フッター */
 footer{
   color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
@@ -515,99 +524,129 @@ footer{
 </head>
 
 <body>
-<div class="container">
-  <header class="topbar">
-    <div class="brand"><h1>カタログ</h1>
-    <!-- ★ 追加：イベント名 / 日付を表示する場所 -->
-    <div id="folderHeader" class="folder-header"></div>
-    </div>
-    <div class="right">
-      <a id="toFolderList" class="btn ghost" href="#">フォルダ選択画面へ</a>
-    </div>
-  </header>
+  <div class="container">
 
-    <!-- タグ検索（あとで選択UIに差し替える前提で、今はとりあえずボタンだけ） -->
-    <div class="controls controls-tags">
-      <button id="tagFilterOpen" class="btn ghost" style="width:100%;">
-        タグで絞り込む
-      </button>
-    </div>
-    
-  <!-- 選択モード＋ダウンロードの行 -->
-  <!-- 2段目：左にDL、右に選択モード -->
-  <div class="controls controls-select">
-    <div class="controls-left">
-      <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
-    </div>
-    <div class="controls-right">
-      <button id="toggleSelectMode" class="btn ghost">選択モード OFF</button>
-    </div>
+    <!-- ▼▼ フォルダ選択ビュー ▼▼ -->
+    <section id="view-folder-list" class="view view-active">
+      <!-- ここは後で実装。今は仮のヘッダだけ置いといてOK -->
+      <header class="topbar">
+        <div class="brand">
+          <h1>フォルダ選択</h1>
+          <div class="folder-header">見たいイベントのフォルダを選んでください</div>
+        </div>
+      </header>
+
+      <!-- ここにフォルダ一覧カードをあとで作る -->
+      <div id="folderList"></div>
+    </section>
+    <!-- ▲▲ フォルダ選択ビュー ▲▲ -->
+
+    <!-- ▼▼ カタログビュー ▼▼ -->
+    <section id="view-catalog" class="view">
+      <header class="topbar">
+        <div class="brand">
+          <h1>カタログ</h1>
+          <div id="folderHeader" class="folder-header"></div>
+        </div>
+        <div class="right">
+          <button id="toFolderList"
+                  class="btn ghost"
+                  type="button"
+                  data-view-target="view-folder-list">
+            フォルダ選択画面へ
+          </button>
+        </div>
+      </header>
+
+      <!-- タグ検索ボタン -->
+      <div class="controls controls-tags">
+        <button id="tagFilterOpen" class="btn ghost" style="width:100%;">
+          タグで絞り込む
+        </button>
+      </div>
+
+      <!-- 2段目：DL＋選択モード -->
+      <div class="controls controls-select">
+        <div class="controls-left">
+          <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
+        </div>
+        <div class="controls-right">
+          <button id="toggleSelectMode" class="btn ghost">選択モード OFF</button>
+        </div>
+      </div>
+
+      <!-- 3段目：ヒント or 全選択 / 全解除 -->
+      <div class="select-row">
+        <p id="selectHint" class="select-hint">
+          写真を選択してダウンロードできます
+        </p>
+        <div id="selectActions" class="select-actions">
+          <button id="selectAll" class="btn ghost small">全選択</button>
+          <button id="clearSelection" class="btn ghost small">全解除</button>
+        </div>
+      </div>
+
+      <div id="grid" class="grid"></div>
+    </section>
+    <!-- ▲▲ カタログビュー ▲▲ -->
+
+    <footer id="copyright"></footer>
   </div>
-  
-  <!-- 3段目：ヒント or 全選択 / 全解除 -->
-  <div class="select-row">
-    <p id="selectHint" class="select-hint">
-      写真を選択してダウンロードできます
-    </p>
-    <div id="selectActions" class="select-actions">
-      <button id="selectAll" class="btn ghost small">全選択</button>
-      <button id="clearSelection" class="btn ghost small">全解除</button>
+
+  <!-- プレビュー用ダイアログ -->
+  <dialog id="viewer">
+    <div class="modal-head">
+      <strong id="v-title"></strong>
+      <button id="v-close" aria-label="閉じる">×</button>
     </div>
-  </div>
+    <div class="modal-body">
+      <div id="v-container"></div>
+    </div>
+  </dialog>
 
-  <div id="grid" class="grid"></div>
+  <!-- ZIP ダイアログ -->
+  <dialog id="zipDialog">
+    <div class="modal-head">
+      <strong id="zipTitle">ZIP作成中…</strong>
+    </div>
+    <div class="modal-body">
+      <p id="zipStatus" style="margin: 0 0 8px; font-size: 13px;">
+        サーバーでZIPファイルを作成しています…
+      </p>
+      <div class="zip-progress">
+        <div class="zip-bar">
+          <div id="zipBarFill"></div>
+        </div>
+        <div id="zipProgressText" class="zip-progress-text">0%</div>
+      </div>
+    </div>
+  </dialog>
 
-  <footer id="copyright"></footer>
+  <!-- タグ絞り込みモーダル -->
+  <dialog id="tagDialog">
+    <div class="modal-head">
+      <strong>タグで絞り込む</strong>
+      <button id="tagDialogClose" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-body tag-body">
+      <p class="tag-help">見たいタグを選んでください（複数選択できます）</p>
+      <div id="tagList" class="tag-list"></div>
+      <div class="tag-footer">
+        <button id="tagClear" class="btn ghost">選択をクリア</button>
+        <button id="tagApply" class="btn">この条件で絞り込む</button>
+      </div>
+    </div>
+  </dialog>
+
   <script>
+    // copyright 用（ここは元のままでOK）
     const FIRST_YEAR = 1996;
     const y = new Date().getFullYear();
     const range = (y === FIRST_YEAR) ? `${y}` : `${FIRST_YEAR}–${y}`;
     const holder = "藤塚太鼓";
     document.getElementById("copyright").textContent = `© ${range} ${holder}`;
   </script>
-</div>
 
-<dialog id="viewer">
-  <div class="modal-head">
-    <strong id="v-title"></strong>
-    <button id="v-close" aria-label="閉じる">×</button>
-  </div>
-  <div class="modal-body">
-    <div id="v-container"></div>
-  </div>
-</dialog>
-
-  <dialog id="zipDialog">
-  <div class="modal-head">
-    <strong id="zipTitle">ZIP作成中…</strong>
-  </div>
-  <div class="modal-body">
-    <p id="zipStatus" style="margin: 0 0 8px; font-size: 13px;">
-      サーバーでZIPファイルを作成しています…
-    </p>
-    <div class="zip-progress">
-      <div class="zip-bar">
-        <div id="zipBarFill"></div>
-      </div>
-      <div id="zipProgressText" class="zip-progress-text">0%</div>
-    </div>
-  </div>
-</dialog>
-  <!-- タグ絞り込みモーダル -->
-<dialog id="tagDialog">
-  <div class="modal-head">
-    <strong>タグで絞り込む</strong>
-    <button id="tagDialogClose" aria-label="閉じる">×</button>
-  </div>
-  <div class="modal-body tag-body">
-    <p class="tag-help">見たいタグを選んでください（複数選択できます）</p>
-    <div id="tagList" class="tag-list"></div>
-    <div class="tag-footer">
-      <button id="tagClear" class="btn ghost">選択をクリア</button>
-      <button id="tagApply" class="btn">この条件で絞り込む</button>
-    </div>
-  </div>
-</dialog>
 <script>
 /* ===== 設定 ===== */
 const CONFIG = {
@@ -653,6 +692,13 @@ let selectionMode = false;
 
 let allTags = [];             // すべてのタグ一覧
 let selectedTagFilters = [];  // モーダルで選ばれているタグ
+
+/* ===== 画面切り替え（view） ===== */
+function switchView(targetId){
+  document.querySelectorAll(".view").forEach(v => {
+    v.classList.toggle("view-active", v.id === targetId);
+  });
+}
   
 /* ===== フォルダ一覧読み込み → セレクタへ反映 ===== */
 async function loadFolderIndex(){
@@ -1287,11 +1333,10 @@ function updateFolderHeader(){
 }
 /* ===== 起動 ===== */
 document.addEventListener("DOMContentLoaded", () => {
-  const linkFolderList = document.getElementById("toFolderList");
-  if (linkFolderList && CONFIG.FOLDER_LIST_URL) {
-    linkFolderList.href = CONFIG.FOLDER_LIST_URL;
-    linkFolderList.target = "_self";
-  }
+  // ▼ フォルダ選択画面へ：view 切り替え
+  document.getElementById("toFolderList")?.addEventListener("click", () => {
+    switchView("view-folder-list");
+  });
 
   const input = $("#tagSearchInput");
   const btnSearch = $("#tagSearchButton");
