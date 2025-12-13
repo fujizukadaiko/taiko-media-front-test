@@ -302,12 +302,13 @@ dialog#viewer::backdrop {
 }
 
 .modal-head button {
-  border: 1px solid var(--border);
-  background: var(--chip);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
+  border:none;
+  background:transparent;
+  padding:4px 8px;
+  border-radius:0;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
 }
 
 .modal-body {
@@ -569,7 +570,7 @@ footer{
 <dialog id="viewer">
   <div class="modal-head">
     <strong id="v-title"></strong>
-    <button id="v-close" class="ghost">閉じる</button>
+    <button id="v-close" aria-label="閉じる">×</button>
   </div>
   <div class="modal-body">
     <div id="v-container"></div>
@@ -982,33 +983,37 @@ function setSelectionMode(on) {
 }
 
 function updateSelectButtonsState() {
-  const n = selectedKeys.size;
+  const n         = selectedKeys.size;
   const btnToggle = document.getElementById("toggleSelectMode");
   const btnAll    = document.getElementById("selectAll");
   const btnClear  = document.getElementById("clearSelection");
-  const hint = document.getElementById("selectHint");
-  if (hint) {
-    hint.style.display = selectionMode ? "none" : "";
+  const hint      = document.getElementById("selectHint");
+  const actions   = document.getElementById("selectActions");
+
+  // 選択モードボタンの表示
+  if (btnToggle) {
+    btnToggle.textContent = selectionMode ? "選択モード ON" : "選択モード OFF";
+    btnToggle.classList.toggle("btn-on", selectionMode);
   }
 
-  if (btnToggle) {
-  // ラベルを ON / OFF に変更
-  btnToggle.textContent = selectionMode ? "選択モード ON" : "選択モード OFF";
-  // 見た目用クラスを付け外し
-  btnToggle.classList.toggle("btn-on", selectionMode);
-}
+  // 3段目：ヒント or 全選択/全解除 の切り替え
+  if (hint && actions) {
+    if (selectionMode) {
+      hint.style.display    = "none";
+      actions.style.display = "flex";
+    } else {
+      hint.style.display    = "";
+      actions.style.display = "none";
+    }
+  }
 
+  // 全選択 / 全解除の活性・非活性
   if (btnAll) {
     const allSelected = currentItems.length > 0 && n === currentItems.length;
     btnAll.disabled = !selectionMode || currentItems.length === 0 || allSelected;
-    // 選択モードじゃないときはボタン自体を隠す
-    btnAll.style.display = selectionMode ? "" : "none";
   }
-  
   if (btnClear) {
     btnClear.disabled = !selectionMode || n === 0;
-    // こちらも選択モードのときだけ表示
-    btnClear.style.display = selectionMode ? "" : "none";
   }
 }
 /* ===== プレビュー用モーダル ===== */
