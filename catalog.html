@@ -515,36 +515,62 @@ dialog#tagDialog::backdrop {
 .view.view-active{
   display:block;
 }
-/* ── フォルダ選択画面の一覧（シンプルなリスト） ── */
+/* ── フォルダ選択画面の一覧（シンプルなリスト＋インセット線） ── */
 .folder-list{
   margin-top:12px;
-  border-top:1px solid var(--border);
 }
 
+/* 1件分（ボタン） */
 .folder-item{
   width:100%;
-  padding:10px 4px;
-  border:none;
-  border-bottom:1px solid var(--border);
+  padding:10px 0;
   background:transparent;
+  border:none;
   text-align:left;
-  cursor:pointer;
   display:block;
+  position:relative;   /* 区切り線用 */
+  cursor:pointer;
 }
 
+/* 区切り線：左右少し余白をあけて線を引く */
+.folder-item::after{
+  content:"";
+  position:absolute;
+  left:12px;           /* ここを変えると線の左右の“空き”が変わる */
+  right:12px;
+  bottom:0;
+  border-bottom:1px solid var(--border);
+}
+
+/* 最後の行だけ線を消す */
+.folder-item:last-child::after{
+  border-bottom:none;
+}
+
+/* 1行目：日付 */
 .folder-item-date{
   font-size:12px;
   color:var(--muted);
   margin-bottom:2px;
 }
 
+/* 2行目：タイトル（複数イベントを「、」区切りでそのまま表示） */
 .folder-item-title{
   font-size:14px;
   font-weight:600;
   line-height:1.6;
   color:var(--text);
-  word-break:break-word;   /* 画面幅からはみ出るとき折り返し */
+  word-break:break-word;   /*長いとき折り返し*/
 }
+
+  /* フォルダ選択ビュー自体は枠なし＆背景なしにする */
+#view-folder-list{
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;          /* ここは好みで調整可 */
+}
+  
 /* フッター */
 footer{
   color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
