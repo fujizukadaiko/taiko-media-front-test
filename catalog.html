@@ -398,39 +398,99 @@ dialog#viewer::backdrop {
 }
 
 /* 選択行：左にモード系、右にDLボタン */
+/* 選択行：左にDLボタン、右にモード系ボタン */
 .controls-select {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
 }
 
 .controls-select .controls-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display:flex;
+  align-items:center;
 }
 
 .controls-select .controls-right {
-  margin-left: auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-left:auto;
 }
 
-/* スマホでは DL ボタンを1行フル幅に落とす */
+/* スマホでは 1 行目に DL（フル幅）、2 行目にモード系 */
 @media (max-width: 768px) {
   .controls-select {
-    flex-wrap: wrap;
+    flex-wrap:wrap;
   }
-  .controls-select .controls-right {
-    width: 100%;
+  .controls-select .controls-left {
+    width:100%;
   }
-  .controls-select .controls-right .btn {
-    width: 100%;
+  .controls-select .controls-left .btn {
+    width:100%;     /* DLボタンを1行フル幅に */
   }
 }
   button.btn[disabled] {
   opacity: .4;
   cursor: default;
   box-shadow: none;
+}
+  /* ==== タグ絞り込みモーダル ==== */
+dialog#tagDialog {
+  border:none;
+  padding:0;
+  max-width:min(520px, 95vw);
+  width:95vw;
+  margin:auto;
+  border-radius:16px;
+  overflow:hidden;
+  background:#ffffff;
+}
+
+dialog#tagDialog::backdrop {
+  background:rgba(0,0,0,0.45);
+}
+
+.tag-body{
+  padding:10px 14px 16px;
+  background:#fafdf9;
+  font-size:14px;
+}
+
+.tag-help{
+  margin:0 0 8px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.tag-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:8px 0 12px;
+}
+
+.tag-chip{
+  font-size:13px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--chip);
+  color:var(--text);
+  cursor:pointer;
+}
+
+.tag-chip.active{
+  background:var(--brand);
+  border-color:var(--brand-d);
+  color:#102010;
+}
+
+.tag-footer{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:4px;
 }
 /* フッター */
 footer{
@@ -458,20 +518,24 @@ footer{
       </button>
     </div>
     
-    <!-- 選択モード＋ダウンロードの行 -->
-    <div class="controls controls-select">
-      <div class="controls-left">
-        <button id="toggleSelectMode" class="btn ghost">選択モード OFF</button>
-        <button id="selectAll" class="btn ghost small" style="display:none;">全選択</button>
-        <button id="clearSelection" class="btn ghost small" style="display:none;">全解除</button>
-      </div>
-      <div class="controls-right">
-        <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
-      </div>
-      <div id="selectHint" class="select-hint">
-        写真を選択してダウンロードできます
-      </div>
+      <!-- 選択モード＋ダウンロードの行 -->
+  <div class="controls controls-select">
+    <!-- 左：ダウンロードボタン -->
+    <div class="controls-left">
+      <button id="bulkDownload" class="btn" disabled>ダウンロード (0)</button>
     </div>
+    <!-- 右：選択モード＋全選択・全解除 -->
+    <div class="controls-right">
+      <button id="toggleSelectMode" class="btn ghost">選択モード OFF</button>
+      <button id="selectAll" class="btn ghost small" style="display:none;">全選択</button>
+      <button id="clearSelection" class="btn ghost small" style="display:none;">全解除</button>
+    </div>
+  </div>
+
+  <!-- 3段目：ヒント文 -->
+  <div id="selectHint" class="select-hint">
+    写真を選択してダウンロードできます
+  </div>
 
   <div id="grid" class="grid"></div>
 
@@ -508,6 +572,21 @@ footer{
         <div id="zipBarFill"></div>
       </div>
       <div id="zipProgressText" class="zip-progress-text">0%</div>
+    </div>
+  </div>
+</dialog>
+  <!-- タグ絞り込みモーダル -->
+<dialog id="tagDialog">
+  <div class="modal-head">
+    <strong>タグで絞り込む</strong>
+    <button id="tagDialogClose" class="ghost">閉じる</button>
+  </div>
+  <div class="modal-body tag-body">
+    <p class="tag-help">見たいタグを選んでください（複数選択できます）</p>
+    <div id="tagList" class="tag-list"></div>
+    <div class="tag-footer">
+      <button id="tagClear" class="btn ghost">選択をクリア</button>
+      <button id="tagApply" class="btn">この条件で絞り込む</button>
     </div>
   </div>
 </dialog>
@@ -553,6 +632,9 @@ let currentFolderMeta = {
 
 // ★ 追加：選択モード ON/OFF
 let selectionMode = false;
+
+let allTags = [];             // すべてのタグ一覧
+let selectedTagFilters = [];  // モーダルで選ばれているタグ
   
 /* ===== フォルダ一覧読み込み → セレクタへ反映 ===== */
 async function loadFolderIndex(){
@@ -1047,26 +1129,10 @@ async function openTagEditor(item){
   }
 }
 
-/* ===== タグ検索（AND条件・日付絞り optional） ===== */
-async function runTagSearch(){
-  const input = $("#tagSearchInput");
-  if (!input) return;
-
-  const raw = input.value.trim();
-  if (!raw) {
-    if (currentManifestUrl) {
-      await renderFolder(currentManifestUrl);
-    }
-    return;
-  }
-
-  const tags = [...new Set(
-    raw.split(/\s+/)
-       .map(t => t.trim())
-       .filter(t => t.length > 0)
-  )];
-
-  if (!tags.length) {
+/* ===== タグ検索（モーダルで選んだタグの AND 条件） ===== */
+async function searchByTags(tags){
+  // タグ未選択なら「元のフォルダの一覧」に戻す
+  if (!tags || !tags.length) {
     if (currentManifestUrl) {
       await renderFolder(currentManifestUrl);
     }
@@ -1078,6 +1144,7 @@ async function runTagSearch(){
     params.append("tag", t);
   }
 
+  // 今のフォルダに紐づく date をパラメータに付ける（フォルダ単位検索）
   if (currentManifestUrl){
     try{
       const u = new URL(currentManifestUrl);
@@ -1108,6 +1175,64 @@ async function runTagSearch(){
   }catch(e){
     console.error(e);
     alert("タグ検索中にエラーが発生しました");
+  }
+}
+
+  /* ===== タグモーダルを開いて一覧を表示 ===== */
+async function openTagFilterDialog(){
+  const dlg  = document.getElementById("tagDialog");
+  const list = document.getElementById("tagList");
+  if (!dlg || !list) return;
+
+  // 初回だけタグ一覧を取得
+  if (!allTags.length) {
+    try{
+      const res = await fetch(joinPath(CONFIG.WORKER_ORIGIN, "/tags"));
+      const js  = await res.json();
+      if (res.ok && js.ok && Array.isArray(js.tags)) {
+        allTags = js.tags;
+      } else {
+        console.warn("タグ一覧の取得に失敗:", js);
+      }
+    }catch(e){
+      console.error("タグ一覧取得エラー:", e);
+    }
+  }
+
+  // 一覧を描画
+  list.innerHTML = "";
+  if (!allTags.length) {
+    const p = document.createElement("p");
+    p.textContent = "利用できるタグがまだありません。";
+    p.style.fontSize = "13px";
+    p.style.color = "#888";
+    list.appendChild(p);
+  } else {
+    for (const tag of allTags) {
+      const isActive = selectedTagFilters.includes(tag);
+      const chip = el("button", {
+        type:"button",
+        textContent: tag,
+        className: "tag-chip" + (isActive ? " active" : "")
+      });
+      chip.addEventListener("click", () => {
+        const idx = selectedTagFilters.indexOf(tag);
+        if (idx >= 0) {
+          selectedTagFilters.splice(idx, 1);
+          chip.classList.remove("active");
+        } else {
+          selectedTagFilters.push(tag);
+          chip.classList.add("active");
+        }
+      });
+      list.appendChild(chip);
+    }
+  }
+
+  try{
+    dlg.showModal();
+  }catch(e){
+    console.error(e);
   }
 }
   
@@ -1188,7 +1313,31 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedKeys.clear();
     renderGrid(currentItems, currentFolderNasLink);
   });
+  
+  // タグ絞り込みボタン → モーダルを開く
+  const btnTagFilter = document.getElementById("tagFilterOpen");
+  btnTagFilter?.addEventListener("click", () => {
+    openTagFilterDialog();
+  });
 
+  // タグモーダルのボタンたち
+  document.getElementById("tagDialogClose")?.addEventListener("click", () => {
+    document.getElementById("tagDialog")?.close();
+  });
+
+  document.getElementById("tagClear")?.addEventListener("click", async () => {
+    selectedTagFilters = [];
+    await searchByTags([]);  // 絞り込み解除
+    // チップの見た目もリセット
+    document.querySelectorAll("#tagList .tag-chip").forEach(chip => {
+      chip.classList.remove("active");
+    });
+  });
+
+  document.getElementById("tagApply")?.addEventListener("click", async () => {
+    await searchByTags(selectedTagFilters);
+    document.getElementById("tagDialog")?.close();
+  });
   // 初期状態のボタン表示
   updateSelectButtonsState();
   loadFolderIndex();
