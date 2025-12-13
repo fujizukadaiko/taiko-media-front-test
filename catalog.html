@@ -538,17 +538,17 @@ dialog#tagDialog::backdrop {
 }
 
 /* 区切り線：左右少し余白をあけて線を引く */
-.folder-item::after{
+.folder-item::before{
   content:"";
   position:absolute;
-  left:16px;           /* 線の左右の“空き” */
+  left:16px;
   right:16px;
   bottom:0;
   border-bottom:1px solid var(--border);
 }
 
 /* 最後の行だけ線を消す */
-.folder-item:last-child::after{
+.folder-item:last-child::before{
   border-bottom:none;
 }
 
@@ -568,6 +568,21 @@ dialog#tagDialog::backdrop {
   word-break:break-word;   /* 長いとき折り返し */
 }
 
+  /* 右端の > アイコン（常に縦中央） */
+.folder-item::after{
+  content:"›";                 /* 好みで "＞" でもOK */
+  position:absolute;
+  right:16px;
+  top:50%;
+  transform:translateY(-50%);  /* 行の真ん中にくるように */
+  font-size:18px;
+  color:var(--muted);
+}
+
+  .folder-item:hover{
+  background:#f9fbf7;
+}
+  
  /* フォルダ選択ビュー／カタログビュー自体は枠なし＆背景なしにする */
 #view-folder-list,
 #view-catalog{
@@ -575,6 +590,17 @@ dialog#tagDialog::backdrop {
   border: none;
   box-shadow: none;
   padding: 0;
+}
+
+ .folder-item{
+  width:100%;
+  padding:10px 40px 10px 16px;   /* ← 右を広めにして矢印のスペース確保 */
+  background:transparent;
+  border:none;
+  text-align:left;
+  display:block;
+  position:relative;             /* 区切り線＆矢印用 */
+  cursor:pointer;
 }
   
 /* フッター */
