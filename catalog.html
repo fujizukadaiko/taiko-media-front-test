@@ -613,7 +613,7 @@ footer{
 <body>
   <div class="container">
 
-    <!-- ▼▼ フォルダ選択ビュー ▼▼ -->
+        <!-- ▼▼ フォルダ選択ビュー ▼▼ -->
     <section id="view-folder-list" class="view view-active">
       <header class="topbar">
         <div class="brand">
@@ -628,6 +628,7 @@ footer{
       <!-- フォルダ一覧カード -->
       <div id="folderList" class="folder-list"></div>
     </section>
+    <!-- ▲▲ フォルダ選択ビュー ▲▲ -->
 
       <!-- ここにフォルダ一覧カードをあとで作る -->
       <div id="folderList"></div>
@@ -807,56 +808,87 @@ async function loadFolderIndex(){
 
   if (!folders.length) return;
 
-  const listEl = document.getElementById("folderList");
-  if (listEl) {
-    listEl.innerHTML = "";
+  // ★ フォルダ選択画面に一覧を描画
+  renderFolderList(folders);
 
-      for (const f of folders){
-        const manifestUrl = toWorkerUrl(f.manifest);
-    
-        // ボタン本体（リストの1行）
-        const row = el("button", {
-          type: "button",
-          className: "folder-item"
-        });
-    
-        // 1行目：日付
-        const dateLabel = formatDateJp(f.date || "");
-        const lineDate = el("div", {
-          className: "folder-item-date",
-          textContent: dateLabel || "日付未設定"
-        });
-    
-        // 2行目：イベント名（複数のときは、で区切ったタイトル文字列そのまま）
-        const titleText = f.title || "無題のイベント";
-        const lineTitle = el("div", {
-          className: "folder-item-title",
-          textContent: titleText
-        });
-    
-        row.appendChild(lineDate);
-        row.appendChild(lineTitle);
-    
-        // クリックしたらそのフォルダを読み込み → カタログビューへ
-        row.addEventListener("click", async () => {
-          selectedKeys.clear();
-          setSelectionMode(false);
-          currentManifestUrl = manifestUrl;
-          await renderFolder(currentManifestUrl);
-          switchView("view-catalog");
-        });
-    
-        listEl.appendChild(row);
-      }
-      }
-
-  // 初期状態として、いちおう先頭フォルダを読み込んでおく（
-  // 「フォルダ選択 → すぐ戻る」時に中身が空にならないように）
-  const firstManifest = toWorkerUrl(folders[0].manifest);
-  currentManifestUrl = firstManifest;
-  await renderFolder(currentManifestUrl);
+  // 「最初に開くフォルダ」をどうするかは好みですが、
+  // いまは「フォルダ選択画面を最初に見せる」ので
+  // 自動で renderFolder() しなくてもOK。
 }
+  
+// フォルダ一覧を表示する関数
+function renderFolderList(folders) {
+  const listEl = document.getElementById("folderList");
+  if (!listEl) return;
+  listEl.innerHTML = "";
 
+  // ★ まず ALL 行を追加
+  {
+    const row = el("button", {
+      type: "button",
+      className: "folder-item",
+    });
+
+    const dateDiv = el("div", {
+      className: "folder-item-date",
+      textContent: "ALL",
+    });
+    const titleDiv = el("div", {
+      className: "folder-item-title",
+      textContent: "すべての写真",
+    });
+
+    row.appendChild(dateDiv);
+    row.appendChild(titleDiv);
+
+    row.addEventListener("click", async () => {
+      await loadAllItems();
+      currentFolderMeta = {
+        date: null,
+        title: "すべての写真",
+        place: null,
+        note: null,
+      };
+      updateFolderHeader();
+      switchView("view-catalog");
+    });
+
+    listEl.appendChild(row);
+  }
+
+  // 各フォルダ行
+  folders.forEach((f) => {
+    const manifestUrl = toWorkerUrl(f.manifest);
+
+    const row = el("button", {
+      type: "button",
+      className: "folder-item",
+    });
+
+    const dateDiv = el("div", {
+      className: "folder-item-date",
+      textContent: formatDateJp(f.date || "") || "日付未設定",
+    });
+
+    const titleDiv = el("div", {
+      className: "folder-item-title",
+      textContent: f.title || "無題のイベント",
+    });
+
+    row.appendChild(dateDiv);
+    row.appendChild(titleDiv);
+
+    row.addEventListener("click", async () => {
+      selectedKeys.clear();
+      setSelectionMode(false);
+      currentManifestUrl = manifestUrl;
+      await renderFolder(currentManifestUrl);
+      switchView("view-catalog");
+    });
+
+    listEl.appendChild(row);
+  });
+}
 /* ===== グリッド描画 共通関数 ===== */
 function renderGrid(items, folderNasLink){
   // 状態を更新
@@ -1025,6 +1057,32 @@ function renderGrid(items, folderNasLink){
     });
 
     grid.appendChild(card);
+  }
+}
+  // ★ 追加：ALLフォルダ用のロード
+async function loadAllItems() {
+  try {
+    const url = `${CONFIG.WORKER_ORIGIN}/search/items`; // パラメータなし
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error("ALL load failed", res.status);
+      alert("全フォルダの読み込みに失敗しました");
+      return;
+    }
+    const js = await res.json();
+    if (!js.ok) {
+      console.error(js);
+      alert("全フォルダの読み込みに失敗しました");
+      return;
+    }
+
+    // manifest ではなく search なので renderGrid 直でOK
+    currentItems = js.items || [];
+    currentFolderNasLink = null; // ALLはNASリンクなし想定
+    renderGrid(currentItems, null);
+  } catch (e) {
+    console.error(e);
+    alert("全フォルダの読み込み中にエラーが発生しました");
   }
 }
 
