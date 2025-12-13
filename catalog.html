@@ -868,6 +868,7 @@ function renderGrid(items, folderNasLink){
   updateBulkButton();
   updateSelectButtonsState();
 
+  // フォルダごとDL用バー（NASリンク）
   if (folderNasLink && /^https?:\/\//.test(folderNasLink)){
     const bar = el("div", {
       className: "card",
@@ -898,6 +899,7 @@ function renderGrid(items, folderNasLink){
       updateSelectButtonsState();
     };
 
+    // 上部のチェック＋タイトル行
     const chkWrap = el("div", {
       style: "display:flex;align-items:center;gap:8px;padding:10px 12px"
     });
@@ -949,16 +951,17 @@ function renderGrid(items, folderNasLink){
     chkWrap.appendChild(chk);
     chkWrap.appendChild(label);
 
+    // サムネイル
     const img = el("img", {
       className: "thumb",
       alt: item.title || ""
     });
     img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 
+    // 下部アクション（プレビューボタンだけ）
     const meta = el("div", { className: "meta" });
     const actions = el("div", { className: "actions" });
-    
-    // プレビューボタン
+
     const btnView = el("button", {
       className: "view",
       textContent: "プレビュー"
@@ -997,17 +1000,6 @@ function renderGrid(items, folderNasLink){
       }
     };
     actions.appendChild(btnView);
-
-    // タグ編集ボタン（後で管理者限定にする想定）
-    const btnTag = el("button", {
-      className: "btn",
-      textContent: "タグ編集"
-    });
-    btnTag.onclick = (ev) => {
-      ev.stopPropagation();
-      openTagEditor(item);
-    };
-    actions.appendChild(btnTag);
 
     meta.appendChild(actions);
 
