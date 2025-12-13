@@ -772,6 +772,10 @@ let currentManifestUrl = "";
 let currentItems = [];
 let currentFolderNasLink = null;   // ★ 追加：NASリンク（今は null のままでもOK）
 const selectedKeys = new Set();
+
+// ★ 追加：このフォルダに属する「元のアイテム一覧」を保持
+let originalItems = [];
+
 // ★ 追加：現在選択中フォルダのメタ情報
 let currentFolderMeta = {
   date: null,
@@ -783,7 +787,8 @@ let currentFolderMeta = {
 // ★ 追加：選択モード ON/OFF
 let selectionMode = false;
 
-let allTags = [];             // すべてのタグ一覧
+// すべてのタグ一覧（モーダル表示用）
+let allTags = [];
 let selectedTagFilters = [];  // モーダルで選ばれているタグ
 
 /* ===== 画面切り替え（view） ===== */
@@ -1049,13 +1054,17 @@ async function renderFolder(manifestUrl){
   updateFolderHeader();
 
   const items = data.items || [];
-  currentItems = items;
+
+  // ★ フォルダを切り替えたので、元データとフィルタ状態をリセット
+  originalItems       = items;   // このフォルダにある全アイテム
+  currentItems        = items;   // 現在表示しているアイテム（あとでタグ絞り込みで変わる）
+  selectedTagFilters  = [];      // 選択中タグもクリア
 
   // ★ いまは使わなくても、とりあえず data.folderNasLink を拾っておく
   const folderNasLink = data.folderNasLink || null;
   currentFolderNasLink = folderNasLink;
 
-  renderGrid(items, folderNasLink);
+  renderGrid(currentItems, folderNasLink);
 }
   
 /* ===== 原本DL(複数) → ZIP一括DL ===== */
@@ -1309,81 +1318,50 @@ async function openTagEditor(item){
   }
 }
 
-/* ===== タグ検索（モーダルで選んだタグの AND 条件） ===== */
+/* ===== タグ検索（モーダルで選んだタグの AND 条件・フォルダ内） ===== */
 async function searchByTags(tags){
   // タグ未選択なら「元のフォルダの一覧」に戻す
   if (!tags || !tags.length) {
-    if (currentManifestUrl) {
-      await renderFolder(currentManifestUrl);
-    }
+    currentItems = originalItems;
+    renderGrid(currentItems, currentFolderNasLink);
     return;
   }
 
-  const params = new URLSearchParams();
-  for (const t of tags) {
-    params.append("tag", t);
-  }
+  // AND 条件でフィルタ
+  const filtered = originalItems.filter(item => {
+    const itemTags = Array.isArray(item.tags) ? item.tags : [];
+    // すべての選択タグが含まれているか
+    return tags.every(t => itemTags.includes(t));
+  });
 
-  // 今のフォルダに紐づく date をパラメータに付ける（フォルダ単位検索）
-  if (currentManifestUrl){
-    try{
-      const u = new URL(currentManifestUrl);
-      const d = u.searchParams.get("date");
-      if (d) params.set("date", d);
-    }catch(e){
-      console.warn("date 抽出に失敗しましたが、タグ検索自体は続行します:", e);
-    }
-  }
-
-  const url = `${CONFIG.WORKER_ORIGIN}/search/items?` + params.toString();
-
-  try{
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.error("search/items status=", res.status);
-      alert("タグ検索に失敗しました");
-      return;
-    }
-    const js = await res.json();
-    if (!js.ok) {
-      console.error(js);
-      alert("タグ検索に失敗しました");
-      return;
-    }
-
-    renderGrid(js.items || [], null);
-  }catch(e){
-    console.error(e);
-    alert("タグ検索中にエラーが発生しました");
-  }
+  currentItems = filtered;
+  renderGrid(currentItems, currentFolderNasLink);
 }
 
-  /* ===== タグモーダルを開いて一覧を表示 ===== */
+ /* ===== タグモーダルを開いて一覧を表示（このフォルダ内のタグのみ） ===== */
 async function openTagFilterDialog(){
   const dlg  = document.getElementById("tagDialog");
   const list = document.getElementById("tagList");
   if (!dlg || !list) return;
 
-  // 初回だけタグ一覧を取得
-  if (!allTags.length) {
-    try{
-      const res = await fetch(joinPath(CONFIG.WORKER_ORIGIN, "/tags"));
-      const js  = await res.json();
-      if (res.ok && js.ok && Array.isArray(js.tags)) {
-        allTags = js.tags;
-      } else {
-        console.warn("タグ一覧の取得に失敗:", js);
+  // ★ このフォルダ内のタグを集計
+  const tagSet = new Set();
+  for (const item of originalItems) {
+    if (Array.isArray(item.tags)) {
+      for (const t of item.tags) {
+        if (t && typeof t === "string") {
+          tagSet.add(t);
+        }
       }
-    }catch(e){
-      console.error("タグ一覧取得エラー:", e);
     }
   }
+  allTags = Array.from(tagSet).sort();
 
   // 一覧を描画
   list.innerHTML = "";
   if (!allTags.length) {
     const p = document.createElement("p");
-    p.textContent = "利用できるタグがまだありません。";
+    p.textContent = "このフォルダにはタグがまだありません。";
     p.style.fontSize = "13px";
     p.style.color = "#888";
     list.appendChild(p);
