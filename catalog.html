@@ -1338,7 +1338,7 @@ document.addEventListener("DOMContentLoaded", () => {
     switchView("view-folder-list");
   });
 
-  const input = $("#tagSearchInput");
+    const input = $("#tagSearchInput");
   const btnSearch = $("#tagSearchButton");
   const btnClear  = $("#tagSearchClear");
 
@@ -1349,6 +1349,13 @@ document.addEventListener("DOMContentLoaded", () => {
   input?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       runTagSearch();
+    }
+  });
+
+  btnClear?.addEventListener("click", async () => {
+    if (input) input.value = "";
+    if (currentManifestUrl) {
+      await renderFolder(currentManifestUrl);
     }
   });
 
