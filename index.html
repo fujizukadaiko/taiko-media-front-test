@@ -352,7 +352,7 @@
     </div>
 
     <div class="row" id="history-block">
-      <h3 class="hist-title">アップロード履歴 <span class="note">（一時URLの有効期間は約5分）</span></h3>
+      <h3 class="hist-title">アップロード履歴 <span class="note">（一時URLの有効期間は約5分・履歴は過去3日分まで）</span></h3>
       <div id="result"></div>
     </div>
   </section>
@@ -378,6 +378,8 @@ const SELF_DELETE_TTL_SEC = 30*60; // 30分（参考表示用）
 const LS_KEY = "tm/uploads/v1";    // ローカル履歴のキー
 const CANCELLED_KEEP_MS = 6 * 60 * 60 * 1000; // 取り消し済を残す期間
 const THRESHOLD_MB = 300;          // 300MB超→外部ブラウザ誘導
+// ★ 追加：アップロード履歴を表示しておく期間（ミリ秒）＝ 3日
+const HISTORY_KEEP_MS = 3 * 24 * 60 * 60 * 1000;
 const CATALOG_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/catalog.html";   // ←実URLに
 const STANDALONE_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/index.html";  // ←このページ
 
@@ -484,17 +486,30 @@ async function reissueUrl(item, btn){
 function pruneHistoryExpired(){
   const now = Date.now();
   const list = loadHistory();
-  const kept = list.filter(it=>{
+
+  const kept = list.filter(it => {
+    // ① 自動削除トークン付きで deleteUntil を過ぎたもの → 削除
     if (it.deleteUntil && !it.cancelled) {
       const expired = new Date(it.deleteUntil).getTime() <= now;
       if (expired) return false;
     }
+
+    // ② 取り消し済み → CANCELLED_KEEP_MS を過ぎたら削除
     if (it.cancelled && it.cancelledAt) {
       if (now - it.cancelledAt >= CANCELLED_KEEP_MS) return false;
     }
+
+    // ③ 作成から 3 日以上経っていたら削除（createdAt がある場合だけ見る）
+    if (it.createdAt && (now - it.createdAt) >= HISTORY_KEEP_MS) {
+      return false;
+    }
+
     return true;
   });
-  if (kept.length !== list.length) saveHistory(kept);
+
+  if (kept.length !== list.length) {
+    saveHistory(kept);
+  }
 }
 
 function renderHistory(){
