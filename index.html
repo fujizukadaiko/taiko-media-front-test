@@ -257,6 +257,55 @@
     color:#1f2d32;
     border:1px solid var(--border);
 }
+  /* アップロード画面：タグセクション */
+.upload-tag-section{
+  margin: 12px 0 18px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.upload-tag-title{
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.upload-tag-help{
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.upload-tag-hint{
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* すでに catalog 側で使っているものと同じなら再定義不要 */
+.tag-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:8px 0 4px;
+}
+
+.tag-chip{
+  font-size:13px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--chip);
+  color:var(--text);
+  cursor:pointer;
+}
+
+.tag-chip.active{
+  background:var(--brand);
+  border-color:var(--brand-d);
+  color:#102010;
+}
 </style>
 </head>
 <body>
@@ -269,7 +318,19 @@
     <a id="toCatalog" class="btn ghost small" href="#" role="button">カタログへ</a>
   </div>
 </header>
-
+  
+  <!-- ▼ 追加：アップロード時に付けるタグ選択エリア ▼ -->
+  <section class="upload-tag-section">
+    <h2 class="upload-tag-title">タグ</h2>
+    <p class="upload-tag-help">
+      アップロードする写真・動画に付けるタグを選んでください
+      （複数選択可・このアップロード分すべてに同じタグが付きます）
+    </p>
+    <div id="uploadTagList" class="tag-list"></div>
+    <p id="uploadTagHint" class="upload-tag-hint">タグ未選択</p>
+  </section>
+  <!-- ▲ 追加ここまで ▲ -->
+  
   <section class="box">
     <div class="row filebox">
       <label class="filebtn" for="file">ファイルを選ぶ（画像/動画・複数可）</label>
@@ -363,6 +424,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("LIFF external open failed:", e);
   }
 });
+  
+  // 公式タグ候補（オブジェクト配列）
+let uploadOfficialTags = [];
+
+// ユーザーが選択したタグ名の配列（["発表","子どもの部", ...]）
+let uploadSelectedTags = [];
   
 /** ===== 便利関数 ===== */
 const $ = (s,p=document)=>p.querySelector(s);
@@ -650,8 +717,11 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
         lastPresignUrl: presigned,
         lastPresignAt: Date.now()
       });
-
-      successCount++;
+      
+      // ★ ここで、このファイルにタグを紐付ける（タグ未選択なら即 return）
+      await applyTagsToUploadedItem(key);
+      
+      successCount++;     
     }catch(e){
       console.error("upload failed:", e);
     }finally{
@@ -758,10 +828,121 @@ function removeFileAt(index){
   renderPreUploadList();       // 再描画
   updateFileInfo();            // 合計表示も更新
 }
+
+  function renderUploadTagChips() {
+  const listEl = document.getElementById("uploadTagList");
+  const hintEl = document.getElementById("uploadTagHint");
+  if (!listEl) return;
+
+  listEl.innerHTML = "";
+
+  if (!uploadOfficialTags.length) {
+    listEl.textContent = "利用できるタグがありません";
+    if (hintEl) hintEl.textContent = "";
+    return;
+  }
+
+  for (const tag of uploadOfficialTags) {
+    const name = tag.name;
+
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "tag-chip";
+    chip.textContent = "#" + name;
+
+    if (uploadSelectedTags.includes(name)) {
+      chip.classList.add("active");
+    }
+
+    chip.addEventListener("click", () => {
+      const idx = uploadSelectedTags.indexOf(name);
+      if (idx >= 0) {
+        uploadSelectedTags.splice(idx, 1);
+        chip.classList.remove("active");
+      } else {
+        uploadSelectedTags.push(name);
+        chip.classList.add("active");
+      }
+      updateUploadTagHint();
+    });
+
+    listEl.appendChild(chip);
+  }
+
+  updateUploadTagHint();
+}
+
+function updateUploadTagHint() {
+  const hintEl = document.getElementById("uploadTagHint");
+  if (!hintEl) return;
+
+  if (!uploadSelectedTags.length) {
+    hintEl.textContent = "タグ未選択";
+  } else {
+    hintEl.textContent = "選択中: " + uploadSelectedTags.map(t => "#" + t).join(" ");
+  }
+}
+
+async function loadUploadOfficialTags() {
+  try {
+    const res = await fetch(
+      WORKER_ORIGIN.replace(/\/+$/, "") + "/tags/list?official=1"
+    );
+    if (!res.ok) {
+      console.error("tags/list failed", res.status);
+      return;
+    }
+    const js = await res.json();
+
+    // js.tags がなければ何もしない
+    const all = Array.isArray(js.tags) ? js.tags : [];
+
+    // is_official=1 && disabled=0 だけ、sort_order→name の順に並べる
+    uploadOfficialTags = all
+      .filter(t => !t.disabled && (t.is_official === 1 || t.is_official === true))
+      .sort((a, b) => {
+        const sa = a.sort_order ?? 0;
+        const sb = b.sort_order ?? 0;
+        if (sa !== sb) return sa - sb;
+        return String(a.name).localeCompare(String(b.name), "ja");
+      });
+
+    renderUploadTagChips();
+  } catch (e) {
+    console.error("loadUploadOfficialTags error", e);
+  }
+}
+async function applyTagsToUploadedItem(objectKey) {
+  // タグ未選択なら何もしない
+  if (!uploadSelectedTags.length) return;
+
+  try {
+        const res = await fetch(
+      WORKER_ORIGIN.replace(/\/+$/, "") + "/items/tag",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          key: objectKey,
+          tags: uploadSelectedTags   // ["発表","子どもの部", ...]
+        })
+      }
+    );
+
+    const js = await res.json().catch(() => ({}));
+    if (!res.ok || !js.ok) {
+      console.error("items/tag failed", res.status, js);
+    }
+  } catch (e) {
+    console.error("applyTagsToUploadedItem error", e);
+  }
+}
 /** ===== 初期描画 ===== */
 renderHistory();
 // 放置中も1分毎に掃除＆再描画
 setInterval(()=>{ pruneHistoryExpired(); renderHistory(); }, 60*1000);
+// 既存の初期化処理の中にこれを追加
+loadUploadOfficialTags();
 </script>
 </body>
 </html>
