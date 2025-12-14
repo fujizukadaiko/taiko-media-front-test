@@ -894,12 +894,23 @@ async function loadUploadOfficialTags() {
     }
     const js = await res.json();
 
-    // js.tags がなければ何もしない
-    const all = Array.isArray(js.tags) ? js.tags : [];
+    // API が { tags: [...] } でも [...] でもどっちでも拾えるようにする
+    const all = Array.isArray(js?.tags)
+      ? js.tags
+      : (Array.isArray(js) ? js : []);
 
-    // is_official=1 && disabled=0 だけ、sort_order→name の順に並べる
+    // official / disabled 判定をゆるめに（0,1 / "0","1" / true,false どれでも対応）
+    const isOfficial = (t) => {
+      const v = t.is_official ?? t.isOfficial ?? 0;
+      return v === 1 || v === "1" || v === true;
+    };
+    const isDisabled = (t) => {
+      const v = t.disabled ?? t.is_disabled ?? 0;
+      return v === 1 || v === "1" || v === true;
+    };
+
     uploadOfficialTags = all
-      .filter(t => !t.disabled && (t.is_official === 1 || t.is_official === true))
+      .filter(t => isOfficial(t) && !isDisabled(t))
       .sort((a, b) => {
         const sa = a.sort_order ?? 0;
         const sb = b.sort_order ?? 0;
@@ -907,6 +918,7 @@ async function loadUploadOfficialTags() {
         return String(a.name).localeCompare(String(b.name), "ja");
       });
 
+    console.log("uploadOfficialTags =", uploadOfficialTags);
     renderUploadTagChips();
   } catch (e) {
     console.error("loadUploadOfficialTags error", e);
