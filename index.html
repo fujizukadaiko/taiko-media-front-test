@@ -9,316 +9,341 @@
 <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
-  /* ===== カラーパレット（水色系） ===== */
-  :root{
-    --brand:#a2d7dd;   /* 主色（瓶覗） */
-    --border-strong: #9fcbd6;/* 濃いめの枠線色 */
-    --brand-d:#84b9cb; /* 濃いめ */
-    --bgpage:#ebf6f7;  /* 藍白 */
-    --panel:#ffffff;   /* カード背景 */
-    --text:#1e2a1e;    /* 文字色 */
-    --muted:#6e8d92;   /* サブ文字を水色系に */
-    --border:#c1e4e9;  /* 枠線 */
-    --accent:#a2d7dd;  /* 補助で同色を使う */
-    --accent-2:#86c4a0;/* 進捗バー色（ミント） */
-  }
+  /* =================================================================
+     CSS：テーマ
+     ================================================================= */
+      /* ===== カラーパレット（水色系） ===== */
+        :root{
+            --brand:#a2d7dd;   /* 主色（瓶覗） */
+            --border-strong: #9fcbd6;/* 濃いめの枠線色 */
+            --brand-d:#84b9cb; /* 濃いめ */
+            --bgpage:#ebf6f7;  /* 藍白 */
+            --panel:#ffffff;   /* カード背景 */
+            --text:#1e2a1e;    /* 文字色 */
+            --muted:#6e8d92;   /* サブ文字を水色系に */
+            --border:#c1e4e9;  /* 枠線 */
+            --accent:#a2d7dd;  /* 補助で同色を使う */
+            --accent-2:#86c4a0;/* 進捗バー色（ミント） */
+        }
 
-  /* 使い方（ghost）＝うっすい水色チップ */
-  .btn.ghost{
-    border: 1px solid var(--border-strong);     /* ← ここだけ差し替え */
-    background: #f2fbfd;
-    color: #1f2d32;
-  }
+  /* =================================================================
+     CSS：基本
+     ================================================================= */
+      *{ box-sizing:border-box }
+      html,body{ height:100% }
 
-  *{ box-sizing:border-box }
-  html,body{ height:100% }
+      /* ページ背景 */
+      html{ background:var(--bgpage) }
+      body{
+          margin:0;
+          min-height:100svh;
+          padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                  env(safe-area-inset-bottom) env(safe-area-inset-left);
+          background:var(--bgpage);
+          color:var(--text);
+          font:16px/1.6 system-ui,-apple-system,"Segoe UI",Arial;
+      }
 
-  /* ページ背景 */
-  html{ background:var(--bgpage) }
-  body{
-    margin:0;
-    min-height:100svh;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right)
-             env(safe-area-inset-bottom) env(safe-area-inset-left);
-    background:var(--bgpage);
-    color:var(--text);
-    font:16px/1.6 system-ui,-apple-system,"Segoe UI",Arial;
-  }
+  /* =================================================================
+     CSS：レイアウト
+     ================================================================= */
+      /* 画面左右に余白 */
+        .container{ max-width:860px; margin:24px auto; padding:0 14px }
 
-  /* 画面左右に余白 */
-  .container{ max-width:860px; margin:24px auto; padding:0 14px }
+  /* =================================================================
+     CSS：ヘッダー
+     ================================================================= */
+      /* ヘッダ */
+        .topbar{
+            display:flex; gap:12px; align-items:center; justify-content:space-between;
+            background:#fff; border:1px solid var(--border);
+            padding:14px 16px; border-radius:16px; margin:12px 0 20px;
+        }
 
-  /* ヘッダ */
-  .topbar{
-    display:flex; gap:12px; align-items:center; justify-content:space-between;
-    background:#fff; border:1px solid var(--border);
-    padding:14px 16px; border-radius:16px; margin:12px 0 20px;
-  }
+        /* タイトル（少し小さめ） */
+        .brand h1{
+            font-size:clamp(18px, 3.8vw, 22px);
+            line-height:1.25; margin:0;
+        }
 
-  /* タイトル（少し小さめ） */
-  .brand h1{
-    font-size:clamp(18px, 3.8vw, 22px);
-    line-height:1.25; margin:0;
-  }
+  /* =================================================================
+     CSS：カード
+     ================================================================= */
+      /* カード */
+        .box{
+            background:var(--panel); border:1px solid var(--border);
+            max-width:860px; margin:0 auto; padding:18px; border-radius:16px;
+        }
 
-  /* カード */
-  .box{
-    background:var(--panel); border:1px solid var(--border);
-    max-width:860px; margin:0 auto; padding:18px; border-radius:16px;
-  }
+  /* =================================================================
+     CSS：ファイル選択
+     ================================================================= */
+      /* ファイル選択 */
+        .filebox{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+        input[type="file"]{ display:none }
+        .filebtn{
+            background:#fff; border: 2px solid var(--border-strong);
+            color:var(--text); padding:12px 14px; border-radius:14px;
+            cursor:pointer; box-shadow:none; font-size:13px;
+        }
+        .filebtn:hover{ filter:brightness(1.02) }
+        .fileinfo{ color:var(--muted); font-size:12px }
 
-  /* ファイル選択 */
-  .filebox{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
-  input[type="file"]{ display:none }
-  .filebtn{
-    background:#fff; border: 2px solid var(--border-strong);
-    color:var(--text); padding:12px 14px; border-radius:14px;
-    cursor:pointer; box-shadow:none; font-size:13px;
-  }
-  .filebtn:hover{ filter:brightness(1.02) }
-  .fileinfo{ color:var(--muted); font-size:12px }
+  /* =================================================================
+     CSS：ボタン
+     ================================================================= */
+      /* ボタン */
+        .btn{
+            background:var(--brand); color:#102010; border:none;
+            padding:12px 16px; border-radius:12px; cursor:pointer;
+        }
+        /* ゴーストボタン（薄い水色チップ風） */
+        .btn.ghost{
+            background:#f2fbfd;          /* 薄い水色 */
+            color:#1f2d32;               /* 文字は寒色寄り */
+            border:1px solid var(--border);
+        }
+        /* 小さめ角丸・高さ感は small に合わせる */
+        .btn.small{ padding:8px 12px; font-size:13px; border-radius:10px }
+        .btn:active{ transform:translateY(1px) }
 
-  /* ボタン */
-  .btn{
-    background:var(--brand); color:#102010; border:none;
-    padding:12px 16px; border-radius:12px; cursor:pointer;
-  }
-  .btn.small{ padding:8px 12px; font-size:13px; border-radius:999px }
-  .btn:active{ transform:translateY(1px) }
+      /* アップロード開始（横長・細字・上に余白） */
+        #go{
+            width:100%; max-width:680px; display:block;
+            margin:10px auto 0; font-size:12px; font-weight:400;
+        }
 
-  /* アップロード開始（横長・細字・上に余白） */
-  #go{
-    width:100%; max-width:680px; display:block;
-    margin:10px auto 0; font-size:12px; font-weight:400;
-  }
+  /* =================================================================
+     CSS：進捗
+     ================================================================= */
+      /* 進捗バー：ベースも水色、塗りはやや濃い水色 */
+        #bar{
+            width:100%; height:12px;
+            background:#e8f6f8;                /* ← 青みの淡色 */
+            border:1px solid var(--border);
+            border-radius:999px; overflow:hidden;
+            margin-top:12px;
+        }
+        #bar>div{
+            height:100%; width:0;
+            background:var(--brand-d);         /* ← 濃いめ水色で進捗 */
+            transition:width .15s linear;
+        }
 
-  /* 進捗バー：ベースも水色、塗りはやや濃い水色 */
-  #bar{
-    width:100%; height:12px;
-    background:#e8f6f8;                /* ← 青みの淡色 */
-    border:1px solid var(--border);
-    border-radius:999px; overflow:hidden;
-    margin-top:12px;
-  }
-  #bar>div{
-    height:100%; width:0;
-    background:var(--brand-d);         /* ← 濃いめ水色で進捗 */
-    transition:width .15s linear;
-  }
+  /* =================================================================
+     CSS：履歴
+     ================================================================= */
+        /* 履歴 */
+        .item-row{ padding:12px 0; border-bottom:1px dashed #dfead4 }
+        .hist-name{ font-size:14px; line-height:1.4; color:#406040 }
+        .hist-name:hover{ text-decoration:underline }
+        .item-row.cancelled{ opacity:.55; filter:grayscale(.15) }
+        .status-cancelled{
+            display:inline-block; margin-left:8px; padding:3px 8px; border-radius:999px;
+            background:#f2fbfd; color:#598a93; border:1px solid var(--border); font-size:12px;
+        }
+        .row-actions{ display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap }
+        .row-actions .pill{
+            display:flex; align-items:center; gap:10px;
+            padding:0; border:0; border-radius:999px; background:transparent; color:var(--text);
+        }
 
-  /* 履歴 */
-  .item-row{ padding:12px 0; border-bottom:1px dashed #dfead4 }
-  .hist-name{ font-size:14px; line-height:1.4; color:#406040 }
-  .hist-name:hover{ text-decoration:underline }
-  .item-row.cancelled{ opacity:.55; filter:grayscale(.15) }
-  .status-cancelled{
-    display:inline-block; margin-left:8px; padding:3px 8px; border-radius:999px;
-    background:#f3f7ef; color:#6f7f6a; border:1px solid var(--border); font-size:12px;
-  }
-  .row-actions{ display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap }
-  .row-actions .pill{
-    display:flex; align-items:center; gap:10px; padding:8px 10px;
-    border:1px solid var(--border); border-radius:999px; background:#f7fbf3; color:var(--text);
-  }
+  /* =================================================================
+     CSS：ステータス表示
+     ================================================================= */
+      /* ステータス表示（「アップロード中…」「すべて完了！」） */
+        #status{
+            font-size:12px;                    /* 小さく */
+            color:#3a5b61;                     /* 少し濃い寒色 */
+            margin-top:6px;
+        }
 
-  /* ステータス表示（「アップロード中…」「すべて完了！」） */
-  #status{
-    font-size:12px;                    /* 小さく */
-    color:#3a5b61;                     /* 少し濃い寒色 */
-    margin-top:6px;
-  }
+  /* =================================================================
+     CSS：レスポンシブ
+     ================================================================= */
+        @media (max-width:600px){
+            .btn{ width:100% }
+            .row-actions .btn{ width:auto }
+            .row-actions .btn.small{ padding:8px 12px }
+        }
 
-  @media (max-width:600px){
-    .btn{ width:100% }
-    .row-actions .btn{ width:auto }
-    .row-actions .btn.small{ padding:8px 12px }
-  }
+  /* =================================================================
+     CSS：フッター
+     ================================================================= */
+      /* フッター（中央・小さく・薄く） */
+        footer{
+            color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
+        }
 
-  /* フッター（中央・小さく・薄く） */
-  footer{
-    color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
-  }
+  /* =================================================================
+     CSS：履歴（詳細）
+     ================================================================= */
+      /* 見出し */
+        .hist-title{ margin:16px 0 6px; font-size:16px }
+        .hist-title .note{ font-size:12px; color:var(--muted); margin-left:6px }
 
-  /* 見出し */
-  .hist-title{ margin:16px 0 6px; font-size:16px }
-  .hist-title .note{ font-size:12px; color:var(--muted); margin-left:6px }
-
-  /* 取り消しボタン（水色で統一） */
-  .btn.cancel {
-    background:var(--brand);           /* 通常ボタンと同色の水色 */
-    color:#0e2328;
-  }
+        /* 取り消しボタン（水色で統一） */
+        .btn.cancel {
+            background:var(--brand);           /* 通常ボタンと同色の水色 */
+            color:#0e2328;
+        }
   
-  /* 取り消しのカウントダウンのタイポをボタンと合わせる */
-  .row-actions .pill span{
-    font-size:13px;                    /* 「再発行」と同じ */
-    line-height:1.2;
-  }
-  
-  /* ピル全体も水色系に寄せる */
-  .row-actions .pill{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:0;                 /* 内側余白なし */
-    border:0;                  /* 枠なし */
-    background:transparent;    /* 背景なし */
-  }
-  
-  /* カウントダウンの見た目（再発行と同サイズ感） */
-  .row-actions .countdown{
-    font-size:12px;
-    color:#516b70;
-  }
-  
-  /* 「取り消し済み」チップも水色トーンに */
-  .status-cancelled{
-    background:#f2fbfd;
-    color:#598a93;
-    border:1px solid var(--border);
-    font-size:12px;
-  }
-  #history-block{
-    position:relative;
-    margin-top:16px;
-    padding-top:14px;
-  }
-  #history-block::before{
-    content:"";
-    position:absolute;
-    left:0; right:0; top:0;
-    height:1px;
-    background:linear-gradient(
-      to right,
-      rgba(161, 212, 221, 0),     /* 透明 → */
-      rgba(161, 212, 221, .55),   /* 中央やや濃い */
-      rgba(161, 212, 221, 0)      /* → 透明 */
-    );
-  }
-  /* 進捗の下に注意書き用（小文字） */
-  .tiny-note{
-    margin-top:6px;
-    font-size:12px;
-    color:var(--muted);
-  }
-  
-  /* アンカーでも下線を消してボタン化 */
-  a.btn { 
-    text-decoration: none; 
-    display: inline-block; 
-  }
-  
-  /* 使い方ボタンと同じゴーストボタン（薄い水色チップ風） */
-  .btn.ghost{
-    background:#f2fbfd;          /* 薄い水色 */
-    color:#1f2d32;               /* 文字は寒色寄り */
-    border:1px solid var(--border);
-  }
-  
-  /* 小さめ角丸・高さ感は small に合わせる */
-  .btn.small{
-    padding:8px 12px;
-    font-size:13px;
-    border-radius:10px;          /* 角を四角寄りに（必要なければ既存の999pxでもOK） */
-  }
-  
-  /* アクセシビリティ的にフォーカスリングだけ薄めで */
-  .btn:focus-visible{
-    outline: 2px solid rgba(162,215,221,.6);
-    outline-offset: 2px;
-  }
-  /* 選択中ファイルのプレリスト */
-  #prelist .fitem{
-    display:flex; align-items:center; justify-content:space-between;
-    gap:10px; padding:8px 10px; margin:6px 0;
-    background:#fff; border:1px solid var(--border); border-radius:10px;
-  }
-  #prelist .fleft{
-    min-width:0; display:flex; align-items:center; gap:8px;
-  }
-  #prelist .fname{
-    font-size:13px; color:var(--text);
-    overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
-    max-width: min(70vw, 520px);
-  }
-  #prelist .fsize{
-    font-size:12px; color:var(--muted);
-  }
-  #prelist .delbtn{
-    border:1px solid var(--brand-d);
-    background:#f2fbfd; color:#1f2d32;
-    padding:6px 10px; border-radius:8px; cursor:pointer;
-  }
-  #prelist .delbtn:active{ transform: translateY(1px); }
-  
-  .topbar .right { margin-left:auto; }
-  .topbar .btn.ghost { /* 薄い水色チップ風（既に設定済みなら不要） */
-    background:#f2fbfd;
-    color:#1f2d32;
-    border:1px solid var(--border);
-}
-  /* アップロード画面：タグセクション */
-.upload-tag-section{
-  margin: 12px 0 18px;
-  padding: 12px 14px;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-}
+      /* 取り消しのカウントダウンのタイポをボタンと合わせる */
+        .row-actions .pill span{
+            font-size:13px;                    /* 「再発行」と同じ */
+            line-height:1.2;
+        }
+        
+      /* カウントダウンの見た目（再発行と同サイズ感） */
+        .row-actions .countdown{
+            font-size:12px;
+            color:#516b70;
+        }
+        #history-block{
+            position:relative;
+            margin-top:16px;
+            padding-top:14px;
+        }
+        #history-block::before{
+            content:"";
+            position:absolute;
+            left:0; right:0; top:0;
+            height:1px;
+            background:linear-gradient(
+            to right,
+            rgba(161, 212, 221, 0),     /* 透明 → */
+            rgba(161, 212, 221, .55),   /* 中央やや濃い */
+            rgba(161, 212, 221, 0)      /* → 透明 */
+            );
+        }
+      /* 進捗の下に注意書き用（小文字） */
+        .tiny-note{
+            margin-top:6px;
+            font-size:12px;
+            color:var(--muted);
+        }
+        
+  /* =================================================================
+     CSS：共通/アクセシビリティ
+     ================================================================= */
+        /* アンカーでも下線を消してボタン化 */
+        a.btn { 
+            text-decoration: none; 
+            display: inline-block; 
+        }
+      /* アクセシビリティ的にフォーカスリングだけ薄めで */
+        .btn:focus-visible{
+            outline: 2px solid rgba(162,215,221,.6);
+            outline-offset: 2px;
+        }
+  /* =================================================================
+     CSS：事前リスト
+     ================================================================= */
+      /* 選択中ファイルのプレリスト */
+        #prelist .fitem{
+            display:flex; align-items:center; justify-content:space-between;
+            gap:10px; padding:8px 10px; margin:6px 0;
+            background:#fff; border:1px solid var(--border); border-radius:10px;
+        }
+        #prelist .fleft{
+            min-width:0; display:flex; align-items:center; gap:8px;
+        }
+        #prelist .fname{
+            font-size:13px; color:var(--text);
+            overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+            max-width: min(70vw, 520px);
+        }
+        #prelist .fsize{
+            font-size:12px; color:var(--muted);
+        }
+        #prelist .delbtn{
+            border:1px solid var(--brand-d);
+            background:#f2fbfd; color:#1f2d32;
+            padding:6px 10px; border-radius:8px; cursor:pointer;
+        }
+        #prelist .delbtn:active{ transform: translateY(1px); }
+        
+        .topbar .right { margin-left:auto; }
+        .topbar .btn.ghost { /* 薄い水色チップ風（既に設定済みなら不要） */
+            background:#f2fbfd;
+            color:#1f2d32;
+            border:1px solid var(--border);
+        }
+  /* =================================================================
+     CSS：タグ選択
+     ================================================================= */
+      /* アップロード画面：タグセクション */
+        .upload-tag-section{
+        margin: 12px 0 18px;
+        padding: 12px 14px;
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        }
 
-.upload-tag-title{
-  margin: 0 0 4px;
-  font-size: 14px;
-}
+        .upload-tag-title{
+        margin: 0 0 4px;
+        font-size: 14px;
+        }
 
-.upload-tag-help{
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
+        .upload-tag-help{
+        margin: 0 0 8px;
+        font-size: 12px;
+        color: var(--muted);
+        }
 
-.upload-tag-hint{
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--muted);
-}
+        .upload-tag-hint{
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+        }
 
-/* すでに catalog 側で使っているものと同じなら再定義不要 */
-.tag-list{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin:8px 0 4px;
-}
+      /* すでに catalog 側で使っているものと同じなら再定義不要 */
+        .tag-list{
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        margin:8px 0 4px;
+        }
 
-.tag-chip{
-  font-size:13px;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid var(--border);
-  background:var(--chip);
-  color:var(--text);
-  cursor:pointer;
-}
+        .tag-chip{
+        font-size:13px;
+        padding:6px 10px;
+        border-radius:999px;
+        border:1px solid var(--border);
+        background:var(--chip);
+        color:var(--text);
+        cursor:pointer;
+        }
 
-.tag-chip.active{
-  background:var(--brand);
-  border-color:var(--brand-d);
-  color:#102010;
-}
+        .tag-chip.active{
+        background:var(--brand);
+        border-color:var(--brand-d);
+        color:#102010;
+        }
 </style>
 </head>
+
 <body>
-<div class="container">
- <header class="topbar">
-  <div class="brand">
-    <h1>動画・画像アップロード</h1>
-  </div>
-  <div class="right">
-    <a id="toCatalog" class="btn ghost small" href="#" role="button">カタログへ</a>
-  </div>
-</header>
+    <!-- =========================
+         HTML：ページ
+         ========================= -->
+    <div class="container">
+    <!-- =========================
+         HTML：ヘッダー
+         ========================= -->
+    <header class="topbar">
+    <div class="brand">
+        <h1>動画・画像アップロード</h1>
+    </div>
+    <div class="right">
+        <a id="toCatalog" class="btn ghost small" href="#" role="button">カタログへ</a>
+    </div>
+    </header>
   
+  <!-- =========================
+       HTML：タグ選択
+       ========================= -->
   <!-- ▼ 追加：アップロード時に付けるタグ選択エリア ▼ -->
   <section class="upload-tag-section">
     <h2 class="upload-tag-title">タグ</h2>
@@ -331,6 +356,9 @@
   </section>
   <!-- ▲ 追加ここまで ▲ -->
   
+  <!-- =========================
+       HTML：アップロード
+       ========================= -->
   <section class="box">
     <div class="row filebox">
       <label class="filebtn" for="file">ファイルを選ぶ（画像/動画・複数可）</label>
@@ -355,9 +383,15 @@
       <h3 class="hist-title">アップロード履歴 <span class="note">（一時URLの有効期間は約5分・履歴は過去3日分まで）</span></h3>
       <div id="result"></div>
     </div>
-  </section>
+    </section>
 
+  <!-- =========================
+       HTML：フッター
+       ========================= -->
   <footer id="copyright"></footer>
+  <!-- =========================
+       JS：フッター表示
+       ========================= -->
   <script>
     // 初出年を必要に応じて変更
     const FIRST_YEAR = 1996;
@@ -370,6 +404,9 @@
 </div>
 
 <script>
+// =================================================================
+// JS：設定（ここだけ編集）
+// =================================================================
 /** ===== 設定（ここだけ変更） ===== */
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
@@ -383,6 +420,9 @@ const HISTORY_KEEP_MS = 3 * 24 * 60 * 60 * 1000;
 const CATALOG_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/catalog.html";   // ←実URLに
 const STANDALONE_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/index.html";  // ←このページ
 
+// =================================================================
+// JS：LIFF初期化/外部ブラウザ遷移
+// =================================================================
 /** ===== LIFF 初期化 & 外部遷移 ===== */
 const LIFF_ID = "2008020568-84kZiQbG"; // ←実IDに置換
 let liffReady = false;
@@ -427,12 +467,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
   
+// =================================================================
+// JS：タグ選択（状態）
+// =================================================================
   // 公式タグ候補（オブジェクト配列）
 let uploadOfficialTags = [];
 
 // ユーザーが選択したタグ名の配列（["発表","子どもの部", ...]）
 let uploadSelectedTags = [];
   
+// =================================================================
+// JS：便利関数
+// =================================================================
 /** ===== 便利関数 ===== */
 const $ = (s,p=document)=>p.querySelector(s);
 const pad2 = (n)=> String(n).padStart(2,"0");
@@ -451,6 +497,9 @@ async function detectTakenAt(file){
   return { at: file.lastModified ? new Date(file.lastModified) : new Date(), source:"lastModified" };
 }
 
+// =================================================================
+// JS：履歴（保存/描画/掃除）
+// =================================================================
 /** ===== 履歴（保存・描画・掃除） ===== */
 function loadHistory(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch{ return []; } }
 function saveHistory(list){ localStorage.setItem(LS_KEY, JSON.stringify(list.slice(-200))); }
@@ -604,6 +653,9 @@ function renderHistory(){
   }
 }
 
+// =================================================================
+// JS：ファイル選択（事前チェック）
+// =================================================================
 /** ===== ファイル選択表示 ===== */
 // ファイル選択時：合計表示＆プレリスト描画
 // ファイル選択時：合計表示＆プレリスト描画＋しきい値チェック→外部ブラウザ誘導
@@ -639,6 +691,9 @@ document.getElementById("file")?.addEventListener("change", () => {
   }
 });
 
+// =================================================================
+// JS：ナビゲーション
+// =================================================================
 /** ===== ナビ導線（存在すれば） ===== */
 document.getElementById("toCatalog")?.addEventListener("click", (e) => {
   e.preventDefault();
@@ -646,6 +701,9 @@ document.getElementById("toCatalog")?.addEventListener("click", (e) => {
 });
 document.getElementById("openInBrowser")?.addEventListener("click", (e)=>{ e.preventDefault(); window.open(STANDALONE_URL, "_blank"); });
 
+// =================================================================
+// JS：アップロード本体
+// =================================================================
 /** ===== メイン：アップロード ===== */
 document.getElementById("go")?.addEventListener("click", async ()=>{
   if (!/^https?:\/\//.test(WORKER_ORIGIN)) { alert("Worker URL が不正です"); return; }
@@ -667,7 +725,7 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
   const fileInfo = document.getElementById("fileinfo");
   const goBtn    = document.getElementById("go");
 
-  // UI初期化
+  // 画面初期化
   statusEl.textContent = "";
   statusEl.style.fontSize = "12px";
   statusEl.style.color = "#3b4b50";
@@ -756,6 +814,9 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
   renderPreUploadList(); 
 });
 
+// =================================================================
+// JS：外部ブラウザ遷移ヘルパ
+// =================================================================
 // 外部ブラウザで開く（LIFFがあれば優先、なければ安全フォールバック）
 function openExternal(url){
   try{
@@ -763,7 +824,7 @@ function openExternal(url){
       liff.openWindow({ url, external: true }); // ← LINE公式の外部遷移
       return;
     }
-  }catch(_){/* noop */}
+  }catch(_){/* 何もしない */}
 
   // LINEの内蔵ブラウザは _blank が通らないことがあるので同タブ遷移に寄せる
   if (/Line\/[\d.]+/i.test(navigator.userAgent)) {
@@ -776,6 +837,9 @@ function openExternal(url){
   if (!w) location.href = url;
 }
   
+// =================================================================
+// JS：サイズ/表示ヘルパ
+// =================================================================
 // サイズ表記ヘルパ
 function fmtSize(bytes){
   if (bytes >= 1024*1024) return (bytes/1024/1024).toFixed(1) + " MB";
@@ -794,6 +858,9 @@ function updateFileInfo() {
   info.textContent = `${files.length} 件・合計 ${fmtSize(total)}`;
 }
 
+// =================================================================
+// JS：事前リスト
+// =================================================================
 // プレリストを描画
 function renderPreUploadList(){
   const el = document.getElementById("file");
@@ -844,48 +911,51 @@ function removeFileAt(index){
   updateFileInfo();            // 合計表示も更新
 }
 
+// =================================================================
+// JS：タグ選択（画面/通信）
+// =================================================================
   function renderUploadTagChips() {
-  const listEl = document.getElementById("uploadTagList");
-  const hintEl = document.getElementById("uploadTagHint");
-  if (!listEl) return;
+    const listEl = document.getElementById("uploadTagList");
+    const hintEl = document.getElementById("uploadTagHint");
+    if (!listEl) return;
 
-  listEl.innerHTML = "";
+    listEl.innerHTML = "";
 
-  if (!uploadOfficialTags.length) {
-    listEl.textContent = "利用できるタグがありません";
-    if (hintEl) hintEl.textContent = "";
-    return;
-  }
-
-  for (const tag of uploadOfficialTags) {
-    const name = tag.name;
-
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "tag-chip";
-    chip.textContent = "#" + name;
-
-    if (uploadSelectedTags.includes(name)) {
-      chip.classList.add("active");
+    if (!uploadOfficialTags.length) {
+      listEl.textContent = "利用できるタグがありません";
+      if (hintEl) hintEl.textContent = "";
+      return;
     }
 
-    chip.addEventListener("click", () => {
-      const idx = uploadSelectedTags.indexOf(name);
-      if (idx >= 0) {
-        uploadSelectedTags.splice(idx, 1);
-        chip.classList.remove("active");
-      } else {
-        uploadSelectedTags.push(name);
+    for (const tag of uploadOfficialTags) {
+      const name = tag.name;
+
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "tag-chip";
+      chip.textContent = "#" + name;
+
+      if (uploadSelectedTags.includes(name)) {
         chip.classList.add("active");
       }
-      updateUploadTagHint();
-    });
 
-    listEl.appendChild(chip);
+      chip.addEventListener("click", () => {
+        const idx = uploadSelectedTags.indexOf(name);
+        if (idx >= 0) {
+          uploadSelectedTags.splice(idx, 1);
+          chip.classList.remove("active");
+        } else {
+          uploadSelectedTags.push(name);
+          chip.classList.add("active");
+        }
+        updateUploadTagHint();
+      });
+
+      listEl.appendChild(chip);
+    }
+
+    updateUploadTagHint();
   }
-
-  updateUploadTagHint();
-}
 
 function updateUploadTagHint() {
   const hintEl = document.getElementById("uploadTagHint");
@@ -909,12 +979,12 @@ async function loadUploadOfficialTags() {
     }
     const js = await res.json();
 
-    // API が { tags: [...] } でも [...] でもどっちでも拾えるようにする
+    // 返却データが { tags: [...] } でも [...] でもどっちでも拾えるようにする
     const all = Array.isArray(js?.tags)
       ? js.tags
       : (Array.isArray(js) ? js : []);
 
-    // official / disabled 判定をゆるめに（0,1 / "0","1" / true,false どれでも対応）
+    // 公式/無効 の判定をゆるめに（0,1 / "0","1" / true,false どれでも対応）
     const isOfficial = (t) => {
       const v = t.is_official ?? t.isOfficial ?? 0;
       return v === 1 || v === "1" || v === true;
@@ -964,6 +1034,9 @@ async function applyTagsToUploadedItem(objectKey) {
     console.error("applyTagsToUploadedItem error", e);
   }
 }
+// =================================================================
+// JS：初期化
+// =================================================================
 /** ===== 初期描画 ===== */
 renderHistory();
 // 放置中も1分毎に掃除＆再描画
