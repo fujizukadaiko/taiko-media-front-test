@@ -424,7 +424,7 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
-const FRONT_VERSION = "Front v1.0.2";
+const FRONT_VERSION = "Front v1.0.3";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
@@ -588,40 +588,12 @@ async function proxyPutToB2({ key, contentType, data, onProgress }) {
     xhr.send(data); // ← File でも Blob でもOK
   });
 }
-// proxy-put へ Blob/File を投げる（PUT代理）
-// 進捗は onProgress(0-100) で返す
-async function proxyPutToB2({ key, contentType, data, onProgress }) {
-  const proxyUrl =
-    `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
 
-  return await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", proxyUrl, true);
-    xhr.timeout = 30 * 60 * 1000;
-
-    xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable && typeof onProgress === "function") {
-        const p = Math.round((ev.loaded / ev.total) * 100);
-        onProgress(p);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText || "{}"));
-        } catch {
-          resolve({});
-        }
-      } else {
-        reject(new Error("proxy PUT " + xhr.status));
-      }
-    };
-
-    xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
-    xhr.onerror = () => reject(new Error("proxy PUT network error"));
-    xhr.send(data); // ← File でも Blob でもOK
-  });
+function toJpgKeyFromOriginal(originalKey, prefix){
+  // originalKey: staging/yyyymm/yyyymmdd/...
+  // prefix: "preview" or "thumb"
+  const k = originalKey.replace(/^staging\//, `${prefix}/`);
+  return /\.[^/.]+$/.test(k) ? k.replace(/\.[^/.]+$/, ".jpg") : (k + ".jpg");
 }
 // =================================================================
 // JS：履歴（保存/描画/掃除）
@@ -897,6 +869,46 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
         xhr.send(f);
       });
 
+      // ★ 画像なら preview / thumb を生成してアップロードする
+      let previewKey = null;
+      let thumbKey   = null;
+
+      if ((f.type || "").startsWith("image/")) {
+        try {
+          // preview（長辺1600）
+          const previewBlob = await makeJpegResizedBlob(f, 1600, 0.85);
+          if (previewBlob) {
+            previewKey = toJpgKeyFromOriginal(key, "preview");
+            await proxyPutToB2({
+              key: previewKey,
+              contentType: "image/jpeg",
+              data: previewBlob,
+              onProgress: (p) => {
+                // バーは原本で使ってるので、文字だけ変えるのがおすすめ
+                statusEl.textContent = `previewアップロード ${i+1}/${total} … ${p}%`;
+              },
+            });
+          }
+
+          // thumb（長辺480）
+          const thumbBlob = await makeJpegResizedBlob(f, 480, 0.82);
+          if (thumbBlob) {
+            thumbKey = toJpgKeyFromOriginal(key, "thumb");
+            await proxyPutToB2({
+              key: thumbKey,
+              contentType: "image/jpeg",
+              data: thumbBlob,
+              onProgress: (p) => {
+                statusEl.textContent = `thumbアップロード ${i+1}/${total} … ${p}%`;
+              },
+            });
+          }
+        } catch (e) {
+          console.warn("thumb/preview upload failed:", e);
+          // 失敗しても原本はOKなので続行
+        }
+      }
+
       // 一時URL 5分
       let presigned = "";
       try{
@@ -910,6 +922,8 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       // 履歴へ
       addHistory({
         key, name:safeName,
+        previewKey: previewKey || null,
+        thumbKey: thumbKey || null,
         deleteToken: delInfo?.deleteToken || null,
         deleteUntil: delInfo?.deleteUntil || null,
         createdAt: Date.now(),
