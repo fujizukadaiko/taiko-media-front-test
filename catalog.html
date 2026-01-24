@@ -887,6 +887,18 @@ function toWorkerUrl(pathOrUrl) {
   return joinPath(CONFIG.WORKER_ORIGIN, pathOrUrl);
 }
   
+// --- lazy load 用（1回だけ作る） ---
+const THUMB_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+
+const thumbIO = new IntersectionObserver((entries) => {
+  for (const ent of entries) {
+    if (!ent.isIntersecting) continue;
+    const img = ent.target;
+    const src = img.dataset.src;
+    if (src) img.src = src;
+    thumbIO.unobserve(img);
+  }
+}, { rootMargin: "300px" }); // 300px手前で先読み
 /* =================================================================
    JS：状態
    ================================================================= */
@@ -1086,13 +1098,26 @@ function renderGrid(items, folderNasLink){
 
     // ── サムネイル ──
     const thumbWrap = el("div", { className: "thumb-wrap" });
+
     const img = el("img", {
       className: "thumb",
-      alt: item.title || ""
+      alt: item.title || "",
+      loading: "lazy",
+      decoding: "async",
+      referrerPolicy: "no-referrer",
     });
-    img.src = item.thumb || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+
+    // 最初は軽いプレースホルダだけ
+    img.src = THUMB_PLACEHOLDER;
+
+    // 本物URLは data-src に入れて、見える直前で読み込む
+    if (item.thumb) img.dataset.src = item.thumb;
+
     thumbWrap.appendChild(img);
     card.appendChild(thumbWrap);
+
+    // Observer に登録（item.thumb があるときだけ）
+    if (item.thumb) thumbIO.observe(img);
 
     // ── タグ行 (#タグ1 #タグ2 …) ──
     const meta = el("div", { className: "meta" });
