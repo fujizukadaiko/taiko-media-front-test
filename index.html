@@ -170,9 +170,22 @@
   /* =================================================================
      CSS：フッター
      ================================================================= */
-      /* フッター（中央・小さく・薄く） */
+      /* フッター（中央＋右端にバージョン） */
         footer{
-            color:#94a38f; font-size:11px; margin:28px 0; text-align:center;
+            color:#94a38f;
+            font-size:11px;
+            margin:28px 0;
+            display:grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items:center;
+        }
+        footer #copyright{
+            grid-column:2;
+            justify-self:center;
+        }
+        footer #version{
+            grid-column:3;
+            justify-self:end;
         }
 
   /* =================================================================
@@ -388,7 +401,10 @@
   <!-- =========================
        HTML：フッター
        ========================= -->
-  <footer id="copyright"></footer>
+  <footer>
+    <span id="copyright"></span>
+    <span id="version"></span>
+  </footer>
   <!-- =========================
        JS：フッター表示
        ========================= -->
@@ -408,6 +424,7 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
+const FRONT_VERSION = "Front v1.0.1";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
@@ -419,6 +436,9 @@ const THRESHOLD_MB = 300;          // 300MB超→外部ブラウザ誘導
 const HISTORY_KEEP_MS = 3 * 24 * 60 * 60 * 1000;
 const CATALOG_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/catalog.html";   // ←実URLに
 const STANDALONE_URL = "https://fujizukadaiko.github.io/taiko-media-front-test/index.html";  // ←このページ
+
+const versionEl = document.getElementById("version");
+if (versionEl) versionEl.textContent = FRONT_VERSION;
 
 // =================================================================
 // JS：LIFF初期化/外部ブラウザ遷移
