@@ -424,7 +424,7 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
-const FRONT_VERSION = "Front v1.0.5";
+const FRONT_VERSION = "Front v1.0.6";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
@@ -506,6 +506,42 @@ function ymdSegments(d=new Date()){
   const Y=d.getFullYear(), M=pad2(d.getMonth()+1), D=pad2(d.getDate());
   return { y:`${Y}`, ym:`${Y}${M}`, ymd:`${Y}${M}${D}` };
 }
+// ★日付→イベントslugを取得（同一日を何枚も投げるのでキャッシュする）
+const eventSlugCache = new Map();
+
+function sanitizeSlug(s){
+  return String(s || "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/[\/\\:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+async function fetchEventSlugByDate(ymd){
+  if (eventSlugCache.has(ymd)) return eventSlugCache.get(ymd);
+
+  let slug = "no_event";
+  try{
+    const url = new URL(WORKER_ORIGIN.replace(/\/+$/, "") + "/events/by-date");
+    url.searchParams.set("date", ymd);
+
+    // （任意）ゆる認証を使うなら、ここで k か header を付ける
+    // url.searchParams.set("k", "YOUR_PUBLIC_READ_KEY");
+
+    const res = await fetch(url.toString(), { method: "GET" });
+    const js = await res.json().catch(()=> ({}));
+
+    if (res.ok && js && js.ok && js.slug) {
+      slug = sanitizeSlug(js.slug);
+    }
+  }catch(e){
+    console.warn("fetchEventSlugByDate failed:", e);
+  }
+
+  eventSlugCache.set(ymd, slug || "no_event");
+  return eventSlugCache.get(ymd);
+}
 async function detectTakenAt(file){
   try{
     if (/\.(jpe?g|heic|heif|webp|tiff?)$/i.test(file.name)) {
@@ -515,13 +551,6 @@ async function detectTakenAt(file){
     }
   }catch{}
   return { at: file.lastModified ? new Date(file.lastModified) : new Date(), source:"lastModified" };
-}
-function safeFolderName(s){
-  return String(s || "")
-    .trim()
-    .replace(/[\/\\:*?"<>|]/g, "_")     // ファイルシステム的に危険なもの
-    .replace(/\s+/g, " ")
-    .slice(0, 60) || "no_event";
 }
 // =================================================================
 // JS：履歴（保存/描画/掃除）
@@ -762,14 +791,6 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
   const total = files.length;
   let done = 0, successCount = 0;
 
-  const eventInput =
-    document.getElementById("event")?.value ||
-    document.getElementById("eventName")?.value ||
-    new URLSearchParams(location.search).get("event") ||
-    new URLSearchParams(location.search).get("eventSlug") ||
-    "";
-  const eventSlug = safeFolderName(eventInput);
-
   for (let i = 0; i < total; i++) {
     const f = files[i];
     try{
@@ -784,6 +805,7 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       const safeName = f.name.replace(/[^\w.\-]/g, "_");
       const timeSlug = `${pad2(takenAt.getHours())}${pad2(takenAt.getMinutes())}${pad2(takenAt.getSeconds())}`;
       const Y = takenAt.getFullYear();
+      const eventSlug = await fetchEventSlugByDate(ymd);
       const folder = `${ymd}_${eventSlug}`;
       const key = `media/${Y}/${folder}/${timeSlug}_${rand}_${safeName}`;
       const contentType = f.type || "application/octet-stream";
