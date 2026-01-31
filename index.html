@@ -424,7 +424,7 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
-const FRONT_VERSION = "Front v1.0.3";
+const FRONT_VERSION = "Front v1.0.4";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
@@ -594,6 +594,14 @@ function toJpgKeyFromOriginal(originalKey, prefix){
   // prefix: "preview" or "thumb"
   const k = originalKey.replace(/^staging\//, `${prefix}/`);
   return /\.[^/.]+$/.test(k) ? k.replace(/\.[^/.]+$/, ".jpg") : (k + ".jpg");
+}
+
+function safeFolderName(s){
+  return String(s || "")
+    .trim()
+    .replace(/[\/\\:*?"<>|]/g, "_")     // ファイルシステム的に危険なもの
+    .replace(/\s+/g, " ")
+    .slice(0, 60) || "no_title";
 }
 // =================================================================
 // JS：履歴（保存/描画/掃除）
@@ -847,7 +855,9 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       const rand = Math.random().toString(36).slice(2,8);
       const safeName = f.name.replace(/[^\w.\-]/g, "_");
       const timeSlug = `${pad2(takenAt.getHours())}${pad2(takenAt.getMinutes())}${pad2(takenAt.getSeconds())}`;
-      const key = `staging/${ym}/${ymd}/${timeSlug}_${rand}_${safeName}`;
+      const Y = takenAt.getFullYear();
+      const folder = `${ymd}_${eventSlug}`;
+      const key = `media/${Y}/${folder}/${timeSlug}_${rand}_${safeName}`;
       const contentType = f.type || "application/octet-stream";
 
       // 代理PUT
