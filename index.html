@@ -424,7 +424,7 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
-const FRONT_VERSION = "Front v1.0.4";
+const FRONT_VERSION = "Front v1.0.5";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
@@ -516,92 +516,12 @@ async function detectTakenAt(file){
   }catch{}
   return { at: file.lastModified ? new Date(file.lastModified) : new Date(), source:"lastModified" };
 }
-// 画像ファイルを「長辺 maxSide px」に収まるよう縮小して JPEG Blob を返す
-async function makeJpegResizedBlob(file, maxSide, quality = 0.82) {
-  // 画像として読み込めない（動画など）なら null
-  if (!file.type || !file.type.startsWith("image/")) return null;
-
-  // createImageBitmap は高速＆向き補正が効くことが多い（環境差あり）
-  const bmp = await createImageBitmap(file);
-
-  const w0 = bmp.width;
-  const h0 = bmp.height;
-
-  // すでに十分小さいなら、そのままでもいいが、ここでは「必ずJPEG化」する
-  const scale = Math.min(1, maxSide / Math.max(w0, h0));
-  const w = Math.max(1, Math.round(w0 * scale));
-  const h = Math.max(1, Math.round(h0 * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-
-  const ctx = canvas.getContext("2d", { alpha: false });
-  ctx.drawImage(bmp, 0, 0, w, h);
-
-  // JPEG Blob 化
-  const blob = await new Promise((resolve) => {
-    canvas.toBlob(
-      (b) => resolve(b),
-      "image/jpeg",
-      quality
-    );
-  });
-
-  // 後片付け
-  try { bmp.close && bmp.close(); } catch {}
-
-  return blob; // Blob | null
-}
-// proxy-put へ Blob/File を投げる（PUT代理）
-// 進捗は onProgress(0-100) で返す
-async function proxyPutToB2({ key, contentType, data, onProgress }) {
-  const proxyUrl =
-    `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
-
-  return await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", proxyUrl, true);
-    xhr.timeout = 30 * 60 * 1000;
-
-    xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable && typeof onProgress === "function") {
-        const p = Math.round((ev.loaded / ev.total) * 100);
-        onProgress(p);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText || "{}"));
-        } catch {
-          resolve({});
-        }
-      } else {
-        reject(new Error("proxy PUT " + xhr.status));
-      }
-    };
-
-    xhr.ontimeout = () => reject(new Error("proxy PUT timeout"));
-    xhr.onerror = () => reject(new Error("proxy PUT network error"));
-    xhr.send(data); // ← File でも Blob でもOK
-  });
-}
-
-function toJpgKeyFromOriginal(originalKey, prefix){
-  // originalKey: staging/yyyymm/yyyymmdd/...
-  // prefix: "preview" or "thumb"
-  const k = originalKey.replace(/^staging\//, `${prefix}/`);
-  return /\.[^/.]+$/.test(k) ? k.replace(/\.[^/.]+$/, ".jpg") : (k + ".jpg");
-}
-
 function safeFolderName(s){
   return String(s || "")
     .trim()
     .replace(/[\/\\:*?"<>|]/g, "_")     // ファイルシステム的に危険なもの
     .replace(/\s+/g, " ")
-    .slice(0, 60) || "no_title";
+    .slice(0, 60) || "no_event";
 }
 // =================================================================
 // JS：履歴（保存/描画/掃除）
@@ -842,6 +762,14 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
   const total = files.length;
   let done = 0, successCount = 0;
 
+  const eventInput =
+    document.getElementById("event")?.value ||
+    document.getElementById("eventName")?.value ||
+    new URLSearchParams(location.search).get("event") ||
+    new URLSearchParams(location.search).get("eventSlug") ||
+    "";
+  const eventSlug = safeFolderName(eventInput);
+
   for (let i = 0; i < total; i++) {
     const f = files[i];
     try{
@@ -879,46 +807,6 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
         xhr.send(f);
       });
 
-      // ★ 画像なら preview / thumb を生成してアップロードする
-      let previewKey = null;
-      let thumbKey   = null;
-
-      if ((f.type || "").startsWith("image/")) {
-        try {
-          // preview（長辺1600）
-          const previewBlob = await makeJpegResizedBlob(f, 1600, 0.85);
-          if (previewBlob) {
-            previewKey = toJpgKeyFromOriginal(key, "preview");
-            await proxyPutToB2({
-              key: previewKey,
-              contentType: "image/jpeg",
-              data: previewBlob,
-              onProgress: (p) => {
-                // バーは原本で使ってるので、文字だけ変えるのがおすすめ
-                statusEl.textContent = `previewアップロード ${i+1}/${total} … ${p}%`;
-              },
-            });
-          }
-
-          // thumb（長辺480）
-          const thumbBlob = await makeJpegResizedBlob(f, 480, 0.82);
-          if (thumbBlob) {
-            thumbKey = toJpgKeyFromOriginal(key, "thumb");
-            await proxyPutToB2({
-              key: thumbKey,
-              contentType: "image/jpeg",
-              data: thumbBlob,
-              onProgress: (p) => {
-                statusEl.textContent = `thumbアップロード ${i+1}/${total} … ${p}%`;
-              },
-            });
-          }
-        } catch (e) {
-          console.warn("thumb/preview upload failed:", e);
-          // 失敗しても原本はOKなので続行
-        }
-      }
-
       // 一時URL 5分
       let presigned = "";
       try{
@@ -932,8 +820,6 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       // 履歴へ
       addHistory({
         key, name:safeName,
-        previewKey: previewKey || null,
-        thumbKey: thumbKey || null,
         deleteToken: delInfo?.deleteToken || null,
         deleteUntil: delInfo?.deleteUntil || null,
         createdAt: Date.now(),
