@@ -424,7 +424,7 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
-const FRONT_VERSION = "Front v1.0.8";
+const FRONT_VERSION = "Front v1.0.9";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const TAGGER_API_KEY = ""; // /tagger/enqueue がAPIキー必須なら設定
 const MAX_FILE_MB = 2048;
@@ -811,24 +811,52 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       const key = `media/${Y}/${folder}/${timeSlug}_${rand}_${safeName}`;
       const contentType = f.type || "application/octet-stream";
 
-      // 代理PUT
-      const proxyUrl = `${WORKER_ORIGIN}/uploads/proxy-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`;
-      const delInfo = await new Promise((resolve, reject)=>{
+      // 1) presign
+      const pres = await fetch(`${WORKER_ORIGIN}/uploads/presign`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          key,
+          contentType,
+          expires: 900,
+          method: "PUT",
+        }),
+      });
+      if (!pres.ok) throw new Error("presign failed " + pres.status);
+      const presJs = await pres.json().catch(() => ({}));
+      const signedPutUrl = presJs.url;
+      if (!signedPutUrl) throw new Error("presign missing url");
+
+      // 2) direct PUT
+      await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", proxyUrl, true);
-        xhr.timeout = 30*60*1000; // 30分
-        xhr.upload.onprogress = (ev)=>{
+        xhr.open("PUT", signedPutUrl, true);
+        xhr.timeout = 30 * 60 * 1000; // 30分
+        xhr.setRequestHeader("content-type", contentType);
+        xhr.upload.onprogress = (ev) => {
           if (ev.lengthComputable) {
-            const p = Math.round((ev.loaded/ev.total)*100);
+            const p = Math.round((ev.loaded / ev.total) * 100);
             barFill.style.width = p + "%";
             statusEl.textContent = `アップロード中 ${i+1}/${total} … ${p}%`;
           }
         };
-        xhr.onload    = ()=> (xhr.status>=200 && xhr.status<300) ? resolve(JSON.parse(xhr.responseText||"{}")) : reject(new Error("proxy PUT " + xhr.status));
-        xhr.ontimeout = ()=> reject(new Error("proxy PUT timeout"));
-        xhr.onerror   = ()=> reject(new Error("proxy PUT network error"));
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error("direct PUT " + xhr.status));
+        xhr.ontimeout = () => reject(new Error("direct PUT timeout"));
+        xhr.onerror = () => reject(new Error("direct PUT network error"));
         xhr.send(f);
       });
+
+      // 3) commit
+      const commitRes = await fetch(`${WORKER_ORIGIN}/uploads/commit`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+      const delInfo = await commitRes.json().catch(() => ({}));
+      if (!commitRes.ok || !delInfo.ok) throw new Error("commit failed");
 
       // 一時URL 5分
       let presigned = "";
@@ -851,7 +879,7 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       });
       
       // ★ ここで、このファイルにタグを紐付ける（タグ未選択なら即 return）
-      await applyTagsToUploadedItem(key);
+      applyTagsToUploadedItem(key).catch(console.error);
       
       successCount++;     
     }catch(e){
