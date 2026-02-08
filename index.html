@@ -424,7 +424,7 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
-const FRONT_VERSION = "Front v1.1.0";
+const FRONT_VERSION = "Front v1.1.1";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
@@ -793,6 +793,9 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
 
   for (let i = 0; i < total; i++) {
     const f = files[i];
+    const fileId = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    const perf = { a: 0, b: 0, c: 0, d: 0 };
+    let tagPerfScheduled = false;
     try{
       if (f.size > MAX_FILE_MB * 1024 * 1024) { alert(`${f.name} は ${MAX_FILE_MB}MB を超えています`); continue; }
 
@@ -809,53 +812,115 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       const folder = `${ymd}_${eventSlug}`;
       const key = `media/${Y}/${folder}/${timeSlug}_${rand}_${safeName}`;
       const contentType = f.type || "application/octet-stream";
+      logPerf("start", {
+        fileId,
+        key,
+        name: f.name,
+        type: contentType,
+        size: f.size || 0,
+        sizeText: fmtBytes(f.size || 0),
+      });
 
       // 1) presign
-      const pres = await fetch(`${WORKER_ORIGIN}/uploads/presign`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          key,
-          contentType,
-          expires: 900,
-          method: "PUT",
-        }),
-      });
+      let pres = null;
+      let presignErr = null;
+      const tPresign = nowMs();
+      try{
+        pres = await fetch(`${WORKER_ORIGIN}/uploads/presign`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            key,
+            contentType,
+            expires: 900,
+            method: "PUT",
+          }),
+        });
+      }catch(e){
+        presignErr = e;
+      }
+      perf.a = ms(nowMs() - tPresign);
+      logPerf("presign", { fileId, ms: perf.a, httpStatus: pres?.status ?? 0 });
+      if (presignErr) {
+        logPerf("error", { fileId, where: "presign", err: String(presignErr) });
+        throw presignErr;
+      }
       if (!pres.ok) throw new Error("presign failed " + pres.status);
       const presJs = await pres.json().catch(() => ({}));
       const signedPutUrl = presJs.url;
       if (!signedPutUrl) throw new Error("presign missing url");
 
       // 2) direct PUT
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", signedPutUrl, true);
-        xhr.timeout = 30 * 60 * 1000; // 30分
-        xhr.setRequestHeader("content-type", contentType);
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) {
-            const p = Math.round((ev.loaded / ev.total) * 100);
-            barFill.style.width = p + "%";
-            statusEl.textContent = `アップロード中 ${i+1}/${total} … ${p}%`;
-          }
-        };
-        xhr.onload = () =>
-          xhr.status >= 200 && xhr.status < 300
-            ? resolve()
-            : reject(new Error("direct PUT " + xhr.status));
-        xhr.ontimeout = () => reject(new Error("direct PUT timeout"));
-        xhr.onerror = () => reject(new Error("direct PUT network error"));
-        xhr.send(f);
-      });
+      let putStatus = 0;
+      let putErr = null;
+      const tPut = nowMs();
+      try{
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", signedPutUrl, true);
+          xhr.timeout = 30 * 60 * 1000; // 30分
+          xhr.setRequestHeader("content-type", contentType);
+          xhr.upload.onprogress = (ev) => {
+            if (ev.lengthComputable) {
+              const p = Math.round((ev.loaded / ev.total) * 100);
+              barFill.style.width = p + "%";
+              statusEl.textContent = `アップロード中 ${i+1}/${total} … ${p}%`;
+            }
+          };
+          xhr.onload = () => {
+            putStatus = xhr.status;
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error("direct PUT " + xhr.status));
+          };
+          xhr.ontimeout = () => {
+            putStatus = xhr.status || 0;
+            reject(new Error("direct PUT timeout"));
+          };
+          xhr.onerror = () => {
+            putStatus = xhr.status || 0;
+            reject(new Error("direct PUT network error"));
+          };
+          xhr.send(f);
+        });
+      }catch(e){
+        putErr = e;
+      }
+      perf.b = ms(nowMs() - tPut);
+      logPerf("put", { fileId, ms: perf.b, httpStatus: putStatus, ok: !putErr });
+      if (putErr) {
+        logPerf("error", { fileId, where: "put", err: String(putErr) });
+        throw putErr;
+      }
 
       // 3) commit
-      const commitRes = await fetch(`${WORKER_ORIGIN}/uploads/commit`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ key }),
+      let commitRes = null;
+      let delInfo = {};
+      let commitErr = null;
+      const tCommit = nowMs();
+      try{
+        commitRes = await fetch(`${WORKER_ORIGIN}/uploads/commit`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ key }),
+        });
+        delInfo = await commitRes.json().catch(() => ({}));
+      }catch(e){
+        commitErr = e;
+      }
+      perf.c = ms(nowMs() - tCommit);
+      const commitOk = !!(commitRes && commitRes.ok && delInfo && delInfo.ok);
+      logPerf("commit", {
+        fileId,
+        ms: perf.c,
+        httpStatus: commitRes?.status ?? 0,
+        ok: commitOk,
+        body: delInfo,
       });
-      const delInfo = await commitRes.json().catch(() => ({}));
-      if (!commitRes.ok || !delInfo.ok) throw new Error("commit failed");
+      if (commitErr) {
+        logPerf("error", { fileId, where: "commit", err: String(commitErr) });
+        throw commitErr;
+      }
+      if (!commitOk) throw new Error("commit failed");
 
       // 一時URL 5分
       let presigned = "";
@@ -878,10 +943,18 @@ document.getElementById("go")?.addEventListener("click", async ()=>{
       });
       
       // ★ ここで、このファイルにタグを紐付ける（タグ未選択なら即 return）
-      applyTagsToUploadedItem(key).catch(console.error);
+      tagPerfScheduled = true;
+      applyTagsToUploadedItem(key, { fileId, partialMs: perf.a + perf.b + perf.c }).catch((e) => {
+        logPerf("error", { fileId, where: "items/tag", err: String(e) });
+        console.error(e);
+      });
       
       successCount++;     
     }catch(e){
+      logPerf("error", { fileId, where: "upload", err: String(e) });
+      if (!tagPerfScheduled) {
+        logPerf("total", { fileId, ms: ms(perf.a + perf.b + perf.c + perf.d) });
+      }
       console.error("upload failed:", e);
     }finally{
       done++; statusEl.textContent = `完了 ${done}/${total}`;
@@ -926,6 +999,23 @@ function openExternal(url){
 // =================================================================
 // JS：サイズ/表示ヘルパ
 // =================================================================
+function nowMs(){
+  return (typeof performance !== "undefined" && typeof performance.now === "function")
+    ? performance.now()
+    : Date.now();
+}
+function ms(v){ return Math.round(Number(v) || 0); }
+function fmtBytes(bytes){
+  const n = Number(bytes) || 0;
+  if (n >= 1024 * 1024 * 1024) return (n / 1024 / 1024 / 1024).toFixed(2) + " GB";
+  if (n >= 1024 * 1024)        return (n / 1024 / 1024).toFixed(2) + " MB";
+  if (n >= 1024)               return (n / 1024).toFixed(1) + " KB";
+  return n + " B";
+}
+function logPerf(label, obj){
+  console.log(`[PERF] ${label}`, obj);
+}
+
 // サイズ表記ヘルパ
 function fmtSize(bytes){
   if (bytes >= 1024*1024) return (bytes/1024/1024).toFixed(1) + " MB";
@@ -1095,10 +1185,27 @@ async function loadUploadOfficialTags() {
     console.error("loadUploadOfficialTags error", e);
   }
 }
-async function applyTagsToUploadedItem(objectKey) {
-  // タグ未選択なら何もしない
-  if (!uploadSelectedTags.length) return;
+async function applyTagsToUploadedItem(objectKey, perfCtx = {}) {
+  const fileId = perfCtx.fileId || `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  const partialMs = Number(perfCtx.partialMs) || 0;
 
+  // タグ未選択なら何もしない
+  if (!uploadSelectedTags.length) {
+    logPerf("items/tag", {
+      fileId,
+      ms: 0,
+      httpStatus: 0,
+      ok: true,
+      body: { ok: true, skipped: true, reason: "no tags selected" },
+    });
+    logPerf("total", { fileId, ms: ms(partialMs) });
+    return;
+  }
+
+  let httpStatus = 0;
+  let ok = false;
+  let js = {};
+  const tTag = nowMs();
   try {
     const res = await fetch(
       WORKER_ORIGIN.replace(/\/+$/, "") + "/items/tag",
@@ -1112,20 +1219,29 @@ async function applyTagsToUploadedItem(objectKey) {
       }
     );
 
-    const js = await res.json().catch(() => ({}));
-    if (!res.ok || !js.ok) {
-      console.error("items/tag failed", res.status, js);
-      return;
-    }
-
-    console.log("items/tag ok", {
-      itemId: js.itemId ?? js.item_id,
-      tagIds: Array.isArray(js.tagIds) ? js.tagIds : (Array.isArray(js.tag_ids) ? js.tag_ids : []),
-      enqueued: js.enqueued,
-    });
+    httpStatus = res.status;
+    js = await res.json().catch(() => ({}));
+    ok = !!(res.ok && js.ok);
   } catch (e) {
+    js = { error: String(e) };
+    logPerf("error", { fileId, where: "items/tag", err: String(e) });
     console.error("applyTagsToUploadedItem error", e);
+  } finally {
+    const tagMs = ms(nowMs() - tTag);
+    logPerf("items/tag", { fileId, ms: tagMs, httpStatus, ok, body: js });
+    logPerf("total", { fileId, ms: ms(partialMs + tagMs) });
   }
+
+  if (!ok) {
+    console.error("items/tag failed", httpStatus, js);
+    return;
+  }
+
+  console.log("items/tag ok", {
+    itemId: js.itemId ?? js.item_id,
+    tagIds: Array.isArray(js.tagIds) ? js.tagIds : (Array.isArray(js.tag_ids) ? js.tag_ids : []),
+    enqueued: js.enqueued,
+  });
 }
 // =================================================================
 // JS：初期化
