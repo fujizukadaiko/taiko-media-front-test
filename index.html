@@ -424,9 +424,8 @@
 // JS：設定（ここだけ編集）
 // =================================================================
 /** ===== 設定（ここだけ変更） ===== */
-const FRONT_VERSION = "Front v1.0.9";
+const FRONT_VERSION = "Front v1.1.0";
 const WORKER_ORIGIN = "https://taiko-worker-plain.fujizukadaiko.workers.dev";  // 例: https://taiko-worker-plain.xxx.workers.dev
-const TAGGER_API_KEY = ""; // /tagger/enqueue がAPIキー必須なら設定
 const MAX_FILE_MB = 2048;
 const PRESIGN_EXPIRES = 300;       // 一時URL 5分
 const SELF_DELETE_TTL_SEC = 30*60; // 30分（参考表示用）
@@ -1119,31 +1118,11 @@ async function applyTagsToUploadedItem(objectKey) {
       return;
     }
 
-    const itemId = Number(js.itemId || js.item_id || 0);
-    const tagIds = Array.isArray(js.tagIds)
-      ? js.tagIds
-      : (Array.isArray(js.tag_ids) ? js.tag_ids : []);
-    if (!itemId || !tagIds.length) return;
-
-    const headers = { "content-type": "application/json" };
-    if (TAGGER_API_KEY) headers["x-api-key"] = TAGGER_API_KEY;
-
-    const enqRes = await fetch(
-      WORKER_ORIGIN.replace(/\/+$/, "") + "/tagger/enqueue",
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          itemId,
-          mediaKey: objectKey,
-          tagIds,
-        }),
-      },
-    );
-    const enqJs = await enqRes.json().catch(() => ({}));
-    if (!enqRes.ok || !enqJs.ok) {
-      console.error("tagger/enqueue failed", enqRes.status, enqJs);
-    }
+    console.log("items/tag ok", {
+      itemId: js.itemId ?? js.item_id,
+      tagIds: Array.isArray(js.tagIds) ? js.tagIds : (Array.isArray(js.tag_ids) ? js.tag_ids : []),
+      enqueued: js.enqueued,
+    });
   } catch (e) {
     console.error("applyTagsToUploadedItem error", e);
   }
